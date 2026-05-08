@@ -12,6 +12,22 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Validator parity test (gap 3, TS side)
+- New `lsp/src/validate/parity-test.ts` consumes
+  `Tests/Corpus/parity_manifest.json` from the BlueprintAsCode plugin
+  repo (resolved via `BAC_PLUGIN_ROOT` env var, CLI arg, or sibling-repo
+  default) and asserts the TS validator's diagnostic counts match every
+  shared fixture.
+- New `npm run parity` script wraps `tsc` + the runner.
+- 13 of 16 manifest entries verified in lockstep on the TS side
+  (AstOnly). The 3 `AstOnly+Identifiers` entries are skipped — the
+  identifier-resolution pass needs UE reflection that lives only in the
+  plugin's C++ pipeline. C++ counterpart is the `BAC.Validate.ParityManifest`
+  automation test in the plugin repo.
+- Wire-stable contract: any new shared `Validate_*.bac` fixture means
+  one new manifest entry on the plugin side and a passing run of
+  `npm run parity` on this side.
+
 ### Added — Struct schema reflection (`completeStruct` engine-proxy method)
 - New proxy method consumes the plugin's `complete-struct` NDJSON op so
   the LSP can introspect any `UScriptStruct` (built-in or user-defined).

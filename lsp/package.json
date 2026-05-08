@@ -9,8 +9,9 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "build": "tsc -p .",
-    "watch": "tsc -p . -w"
+    "build":  "tsc -p .",
+    "watch":  "tsc -p . -w",
+    "parity": "tsc -p . && node out/validate/parity-test.js"
   },
   "dependencies": {
     "prettier": "^3.3.3",

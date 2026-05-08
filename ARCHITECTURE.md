@@ -187,3 +187,24 @@ npx --package=@vscode/vsce vsce package --skip-license
 Smoke tests for non-trivial features should go under `lsp/src/**` next to the
 module they test, runnable via `node -e "…"` against fixtures in the plugin
 repo's `Examples/` and `Tests/Corpus/` directories.
+
+### Validator parity test
+
+`lsp/src/validate/parity-test.ts` is the TS-side enforcer of the
+validator wire-stable contract. It loads
+`Tests/Corpus/parity_manifest.json` from the BlueprintAsCode plugin
+repo, runs every `AstOnly` fixture through the TS validator, and
+asserts the diagnostic-code counts match the manifest exactly. Run via
+`npm run parity` (rebuilds first).
+
+The plugin root is resolved in this order: argv[2], `$BAC_PLUGIN_ROOT`,
+sibling-repo default (`../BACSample/Plugins/BlueprintAsCode`).
+`AstOnly+Identifiers` entries are skipped — the identifier-resolution
+pass needs UE reflection that only the C++ pipeline has. The C++ side
+asserts the full manifest via the `BAC.Validate.ParityManifest`
+automation test in the plugin.
+
+When adding a new shared fixture: drop the `.bac` in the plugin repo's
+`Tests/Corpus/`, add a manifest entry on that side, run `npm run parity`
+here. Any drift between the two ports breaks one or both tests
+immediately.
