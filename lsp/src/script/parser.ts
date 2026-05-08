@@ -786,6 +786,14 @@ class Parser {
       if (this.match(BacTokenKind.Dot)) {
         const memberName = this.expectIdentifier('member name');
         result = { kind: 'member_access', location, target: result, memberName };
+      } else if (this.check(BacTokenKind.Colon) && this.at(1).kind === BacTokenKind.Colon) {
+        // `Foo::Bar` is the C++ enum-literal syntax — lower it to the same
+        // member-access AST as `Foo.Bar`. Two-colon lookahead because `:`
+        // alone is the type-annotation colon used elsewhere.
+        this.advance(); // first ':'
+        this.advance(); // second ':'
+        const memberName = this.expectIdentifier("member name after '::'");
+        result = { kind: 'member_access', location, target: result, memberName };
       } else if (this.match(BacTokenKind.LBracket)) {
         const index = this.parseExpr();
         if (!index) { return result; }

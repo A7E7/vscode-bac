@@ -12,6 +12,15 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `::` enum-literal syntax (parser member-access)
+- New: `Foo::Bar` parses as a member-access AST node, equivalent to
+  `Foo.Bar`. The C++ enum-literal syntax everyone copies from familiarity
+  (`EAttachmentRule::KeepRelative`, `ESlateVisibility::Visible`, …) now
+  works without forcing users to write `EAttachmentRule.KeepRelative`.
+  Two-token lookahead in `parsePostfix` disambiguates from the
+  type-annotation colon. Wire-stable, atomic with BAC plugin commit
+  f1b6b9c. Parity test 13/16 PASS unchanged.
+
 ### Added — UE-native container + soft-ref synonyms in `genericArity`
 - `TArray`, `TSet`, `TMap`, `TSubclassOf`, `TSoftObjectPtr`, `TSoftClassPtr`
   now recognised as synonyms for `Set`, `Map`, `Class`, `SoftObject`,
