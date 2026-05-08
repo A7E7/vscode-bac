@@ -12,6 +12,16 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — wire-stable diagnostic code `BAC3100` (partial regeneration applied)
+- Reserved on the plugin side (gap 4 foundation). Surfaced by the
+  watcher's `bac.sync.events` push channel when the generator returns a
+  Partial result — i.e. some `.bac` constructs failed to lower but the
+  rest synthesised, and the watcher applied the best-effort BP rather
+  than dropping the whole sync. The LSP already plumbs `BAC3xxx` codes
+  through `engine-proxy`'s sync-events path; no client change needed
+  beyond surfacing the new code in the Problems panel like the
+  `BAC24xx` siblings.
+
 ### Added — Validator parity test (gap 3, TS side)
 - New `lsp/src/validate/parity-test.ts` consumes
   `Tests/Corpus/parity_manifest.json` from the BlueprintAsCode plugin
