@@ -99,6 +99,12 @@ let lastAutoDetected: string | undefined;
 let engineProxy:        BacEngineProxy | undefined;
 let engineProxyForPath: string | undefined;  // projectDir the current proxy targets
 
+// Last sync event we published per .bac URI. Used to clear stale sync
+// diagnostics (e.g. a conflict was resolved → next event is `applied` →
+// publish nothing). Keyed by URI; value is just a marker that "we own this
+// URI's sync diagnostic at the moment".
+const syncDiagnosticsByUri = new Map<string, Diagnostic[]>();
+
 // ─── Entry point ────────────────────────────────────────────────────────────
 const formatIdx       = process.argv.indexOf('--format');
 const onceNoEngineIdx = process.argv.indexOf('--once-no-engine');
@@ -519,6 +525,37 @@ function ensureEngineProxy(connection: ReturnType<typeof createConnection>): voi
       if (level === 'error')      { connection.console.error(msg); }
       else if (level === 'warn')  { connection.console.warn(msg);  }
       else                        { connection.console.info(msg);  }
+    },
+    onSyncEvent: (payload) => {
+      // The plugin may not include a bacPath (e.g. orphan beyond content
+      // tree). When we do have one, surface as a file-level diagnostic on
+      // the matching URI so VS Code shows it on the .bac in the explorer.
+      if (!payload.bacPath) {
+        connection.console.info(`bac.sync ${payload.code}: ${payload.message}`);
+        return;
+      }
+      const uri = URI.file(payload.bacPath).toString();
+      // BAC2401 (applied) clears any prior sync diagnostic on this URI —
+      // it's an info "we fixed it" not a persistent problem.
+      if (payload.code === 'BAC2401') {
+        syncDiagnosticsByUri.delete(uri);
+        connection.sendDiagnostics({ uri, diagnostics: [] });
+        connection.console.info(`bac.sync applied: ${payload.assetPath}`);
+        return;
+      }
+      const sev =
+        payload.severity === 'error'   ? DiagnosticSeverity.Error :
+        payload.severity === 'warning' ? DiagnosticSeverity.Warning :
+                                          DiagnosticSeverity.Information;
+      const diag: Diagnostic = {
+        severity: sev,
+        range:    { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        code:     payload.code,
+        message:  `${payload.message}`,
+        source:   'bac.sync',
+      };
+      syncDiagnosticsByUri.set(uri, [diag]);
+      connection.sendDiagnostics({ uri, diagnostics: [diag] });
     },
   });
   engineProxy.start();

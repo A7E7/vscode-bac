@@ -12,6 +12,18 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — BP ↔ .bac sync (LSP-side)
+- `BacEngineProxy` learned a push-channel handler: any line received
+  whose shape is `{ "event": "...", "payload": {...} }` (no `id`) is
+  routed to a callback rather than treated as a request response.
+- New `onSyncEvent` proxy option: server-pushed `bac.sync` events
+  (BAC2401 applied / BAC2410 conflict / BAC2430 orphan / etc.) get
+  surfaced as file-level diagnostics on the matching `.bac` URI when the
+  plugin includes a `bacPath` in the payload. `BAC2401` (applied) clears
+  any prior sync diagnostic on the URI — it's "we fixed it" not a
+  persistent problem. **Wire-stable contract** — coordinated with the
+  plugin's `BacCompletionServer` push channel.
+
 ### Added — IDE features (LSP)
 - **Signature help** — parameter hints inside an open call (`(` opens, `,`
   advances active parameter). Resolves script-defined functions/events

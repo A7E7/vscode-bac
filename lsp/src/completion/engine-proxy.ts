@@ -60,6 +60,16 @@ interface DiscoveryFile {
   projectDir: string;
 }
 
+/** Push-channel payload sent by the plugin's BacSyncSubsystem (no `id`). */
+export interface BacSyncEventPayload {
+  assetPath: string;
+  bacPath?:  string;        // absolute disk path of the .bac, when known
+  code:      string;        // BAC24xx
+  severity:  'error' | 'warning' | 'info';
+  message:   string;
+  decision:  string;        // "applied" | "conflict" | "orphan" | …
+}
+
 export interface EngineProxyOptions {
   /** Where to look for `Saved/BacEditorEndpoint.json`. Usually the dir of the active `.uproject`. */
   projectDir:    string;
@@ -69,6 +79,8 @@ export interface EngineProxyOptions {
   requestTimeoutMs?: number;
   /** Optional sink for diagnostic logging (LSP `connection.console`). */
   log?: (level: 'info' | 'warn' | 'error', msg: string) => void;
+  /** Called when the plugin pushes a `bac.sync` event over the open socket. */
+  onSyncEvent?: (payload: BacSyncEventPayload) => void;
 }
 
 export class BacEngineProxy {
@@ -89,6 +101,7 @@ export class BacEngineProxy {
       discoveryPollMs:  opts.discoveryPollMs  ?? 1000,
       requestTimeoutMs: opts.requestTimeoutMs ?? 3000,
       log:              opts.log              ?? (() => { /* swallow */ }),
+      onSyncEvent:      opts.onSyncEvent      ?? (() => { /* no consumer */ }),
     };
     this.endpointPath = path.join(this.opts.projectDir, 'Saved', 'BacEditorEndpoint.json');
   }
@@ -200,11 +213,18 @@ export class BacEngineProxy {
       const line = this.receiveBuffer.slice(0, nl);
       this.receiveBuffer = this.receiveBuffer.slice(nl + 1);
       if (line.trim().length === 0) { continue; }
-      let parsed: { id?: string; ok?: boolean; error?: string } & Record<string, unknown>;
+      let parsed: { id?: string; ok?: boolean; error?: string; event?: string; payload?: unknown } & Record<string, unknown>;
       try {
         parsed = JSON.parse(line);
       } catch {
         this.opts.log('warn', `bac engine: malformed response: ${line.slice(0, 200)}`);
+        continue;
+      }
+      // Server-initiated push (no `id`, has `event`).
+      if (typeof parsed.event === 'string') {
+        if (parsed.event === 'bac.sync' && parsed.payload && typeof parsed.payload === 'object') {
+          this.opts.onSyncEvent(parsed.payload as BacSyncEventPayload);
+        }
         continue;
       }
       const id = parsed.id;
