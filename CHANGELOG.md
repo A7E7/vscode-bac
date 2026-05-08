@@ -12,6 +12,15 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Changed — sync diagnostic accumulation
+- The LSP now stores sync diagnostics per `(URI, code)` instead of one
+  per URI. Two real cases drove this:
+  - `BAC2410` (conflict) and `BAC2440` (fidelity gap) co-exist on the
+    same `.bac` — both should be visible at once.
+  - `BAC2401` (applied) means "the conflict was resolved" — it now
+    clears only the `BAC2410` entry, leaving the persistent fidelity
+    warnings in place.
+
 ### Added — BP ↔ .bac sync (LSP-side)
 - `BacEngineProxy` learned a push-channel handler: any line received
   whose shape is `{ "event": "...", "payload": {...} }` (no `id`) is

@@ -99,11 +99,18 @@ let lastAutoDetected: string | undefined;
 let engineProxy:        BacEngineProxy | undefined;
 let engineProxyForPath: string | undefined;  // projectDir the current proxy targets
 
-// Last sync event we published per .bac URI. Used to clear stale sync
-// diagnostics (e.g. a conflict was resolved → next event is `applied` →
-// publish nothing). Keyed by URI; value is just a marker that "we own this
-// URI's sync diagnostic at the moment".
-const syncDiagnosticsByUri = new Map<string, Diagnostic[]>();
+// Sync diagnostics published per .bac URI, keyed by diagnostic code so
+// independent codes don't clobber each other. Two real cases:
+//   • BAC2410 (conflict) and BAC2440 (fidelity gap) co-exist on the same
+//     .bac — we want to show both at once.
+//   • BAC2401 (applied) means "the conflict you saw is now resolved" — it
+//     should clear ONLY the conflict entry, not the fidelity warnings.
+const syncDiagsByUri = new Map<string, Map<string, Diagnostic>>();
+
+function publishSyncFor(connection: ReturnType<typeof createConnection>, uri: string): void {
+  const m = syncDiagsByUri.get(uri);
+  connection.sendDiagnostics({ uri, diagnostics: m ? Array.from(m.values()) : [] });
+}
 
 // ─── Entry point ────────────────────────────────────────────────────────────
 const formatIdx       = process.argv.indexOf('--format');
@@ -535,27 +542,31 @@ function ensureEngineProxy(connection: ReturnType<typeof createConnection>): voi
         return;
       }
       const uri = URI.file(payload.bacPath).toString();
-      // BAC2401 (applied) clears any prior sync diagnostic on this URI —
-      // it's an info "we fixed it" not a persistent problem.
+      let perCode = syncDiagsByUri.get(uri);
+      if (!perCode) { perCode = new Map(); syncDiagsByUri.set(uri, perCode); }
+
+      // BAC2401 (applied) means "the conflict that was on this file is
+      // now resolved" — clear only the conflict entry. Fidelity-gap
+      // warnings (BAC2440) and others stay.
       if (payload.code === 'BAC2401') {
-        syncDiagnosticsByUri.delete(uri);
-        connection.sendDiagnostics({ uri, diagnostics: [] });
+        perCode.delete('BAC2410');
+        publishSyncFor(connection, uri);
         connection.console.info(`bac.sync applied: ${payload.assetPath}`);
         return;
       }
+
       const sev =
         payload.severity === 'error'   ? DiagnosticSeverity.Error :
         payload.severity === 'warning' ? DiagnosticSeverity.Warning :
                                           DiagnosticSeverity.Information;
-      const diag: Diagnostic = {
+      perCode.set(payload.code, {
         severity: sev,
         range:    { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
         code:     payload.code,
-        message:  `${payload.message}`,
+        message:  payload.message,
         source:   'bac.sync',
-      };
-      syncDiagnosticsByUri.set(uri, [diag]);
-      connection.sendDiagnostics({ uri, diagnostics: [diag] });
+      });
+      publishSyncFor(connection, uri);
     },
   });
   engineProxy.start();
