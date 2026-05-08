@@ -33,6 +33,7 @@ export enum BacTokenKind {
   Kw_Attach,
   Kw_Construction,
   Kw_Widget,
+  Kw_Macro,
 
   // Keywords — control flow
   Kw_If,
@@ -120,6 +121,7 @@ const KW_NAMES: Record<string, BacTokenKind> = {
   attach:       BacTokenKind.Kw_Attach,
   construction: BacTokenKind.Kw_Construction,
   widget:       BacTokenKind.Kw_Widget,
+  macro:        BacTokenKind.Kw_Macro,
   if:           BacTokenKind.Kw_If,
   else:         BacTokenKind.Kw_Else,
   for:          BacTokenKind.Kw_For,

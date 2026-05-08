@@ -221,6 +221,14 @@ function formatClassMember(m: ast.BacMember): string {
         decoratorsBlock,
       ].filter(Boolean).join('\n');
     }
+    case 'macro': {
+      const params = m.params.map(p => `${p.name}: ${formatType(p.type)}`).join(', ');
+      const ret    = m.returnType ? `: ${formatType(m.returnType)}` : '';
+      return [
+        `\`macro\` **${m.name}**(${params})${ret}`,
+        decoratorsBlock,
+      ].filter(Boolean).join('\n');
+    }
   }
 }
 

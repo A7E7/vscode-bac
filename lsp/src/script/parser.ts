@@ -286,9 +286,10 @@ class Parser {
       case BacTokenKind.Kw_Event:        return this.parseEventDecl(decorators);
       case BacTokenKind.Kw_Construction: return this.parseConstructionDecl(decorators);
       case BacTokenKind.Kw_Widget:       return this.parseWidgetDecl(decorators);
+      case BacTokenKind.Kw_Macro:        return this.parseMacroDecl(decorators);
       default: {
         this.error(
-          `Expected class member (var, component, function, event, construction, widget) but got '${tokenKindName(this.current().kind)}'.`,
+          `Expected class member (var, component, function, event, construction, widget, macro) but got '${tokenKindName(this.current().kind)}'.`,
           this.current().location, 'BAC1021');
         return undefined;
       }
@@ -371,6 +372,36 @@ class Parser {
       const method = this.expectIdentifier('interface method name');
       out.interfaceImpl = `${iface}.${method}`;
     }
+    this.skipNewlines();
+    out.body = this.parseBlock();
+    return out;
+  }
+
+  // `macro Name(params): Ret { … }` — same syntactic shape as a function
+  // but produces a BacMacroDecl. The plugin's generator stores macros on
+  // Blueprint->MacroGraphs with UK2Node_Tunnel terminators. Phase 1 only
+  // round-trips the declaration surface — non-empty bodies emit BAC3145
+  // on the C++ side and the body content is dropped.
+  private parseMacroDecl(decorators: ast.BacDecorator[]): ast.BacMacroDecl {
+    const out: ast.BacMacroDecl = {
+      kind: 'macro', location: this.current().location, decorators,
+      name: '', params: [], body: { kind: 'block', location: NO_LOCATION, statements: [] },
+    };
+    this.advance(); // 'macro'
+    out.name = this.expectIdentifier('macro name');
+    if (!this.expect(BacTokenKind.LParen, "'(' to begin parameter list")) { return out; }
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RParen)) { break; }
+      const p = this.parseParam();
+      if (!p) { break; }
+      out.params.push(p);
+      this.skipNewlines();
+      if (!this.match(BacTokenKind.Comma)) { break; }
+    }
+    this.skipNewlines();
+    this.expect(BacTokenKind.RParen, "')' to close parameter list");
+    if (this.match(BacTokenKind.Colon)) { out.returnType = this.parseTypeRef(); }
     this.skipNewlines();
     out.body = this.parseBlock();
     return out;

@@ -12,6 +12,18 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `macro` keyword (gap 1a Phase 1, declaration surface)
+- New `Kw_Macro` token + `BacMacroDecl` AST + `parseMacroDecl` mirroring
+  the function parser. The plugin generator stores macros on
+  `Blueprint->MacroGraphs` and uses `UK2Node_Tunnel` terminators for
+  the entry/exit. Phase 1 ships declaration only — non-empty bodies
+  emit `BAC3145` (warning, body dropped) on the C++ side.
+- Validators treat macro members as no-ops for Phase 1, same way the
+  TS port handled `widget` initially. Hover formatter learns the
+  `macro` arm.
+- Wire-stable, atomic with BAC plugin commit b8b2ad3. Parity test
+  unchanged at 13/16 PASS.
+
 ### Added — `::` enum-literal syntax (parser member-access)
 - New: `Foo::Bar` parses as a member-access AST node, equivalent to
   `Foo.Bar`. The C++ enum-literal syntax everyone copies from familiarity

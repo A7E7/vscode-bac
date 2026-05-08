@@ -38,7 +38,7 @@ export function runContractCheck(scriptAst: ast.BacScriptAst, out: BacDiagnostic
 }
 
 // ─── Decorator target taxonomy ──────────────────────────────────────────────
-type Target = 'class' | 'variable' | 'component' | 'function' | 'event' | 'construction' | 'widget' | 'param';
+type Target = 'class' | 'variable' | 'component' | 'function' | 'event' | 'construction' | 'widget' | 'macro' | 'param';
 
 function targetName(t: Target): string {
   switch (t) {
@@ -49,6 +49,7 @@ function targetName(t: Target): string {
     case 'event':        return 'event';
     case 'construction': return 'construction block';
     case 'widget':       return 'widget';
+    case 'macro':        return 'macro';
     case 'param':        return 'parameter';
   }
 }
@@ -61,6 +62,7 @@ function memberToTarget(k: ast.BacMember['kind']): Target {
     case 'event':        return 'event';
     case 'construction': return 'construction';
     case 'widget':       return 'widget';
+    case 'macro':        return 'macro';
   }
 }
 
