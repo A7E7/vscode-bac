@@ -12,6 +12,20 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Widget Blueprint compatibility, Phase 3 (property bindings)
+- New `FatArrow` token (`=>`); lexer extends the `=` case to emit it.
+  Wire-stable parser change atomic with BAC plugin commit. The plugin
+  generator records each `=>` as a `FDelegateEditorBinding` on
+  `UWidgetBlueprint::Bindings`.
+- `BacAssignment` AST gains optional `isBinding: boolean` flag. The
+  widget assignment parser sets it when it sees `=>`; the parser still
+  accepts `=` for static overrides as before.
+- New diagnostic codes reserved on the plugin side: `BAC3140`–
+  `BAC3142` for binding errors. Surface via the existing
+  `bac.sync.events` push channel like other `BAC3xxx` codes.
+- v1 supports function bindings only (`Visibility => GetTitle`).
+  Variable bindings defer to Phase 3b.
+
 ### Added — Widget Blueprint compatibility, Phase 2 (slot properties)
 - Property-override names now accept dotted paths via the new
   `expectAssignmentName` helper. Wire-stable parser change atomic

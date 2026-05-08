@@ -465,10 +465,16 @@ class Parser {
       const location = this.current().location;
       const name = this.expectAssignmentName('widget property name');
       if (!name) { break; }
-      if (!this.expect(BacTokenKind.Assign, "'=' between property name and value")) { break; }
+      // `=>` introduces a UMG property binding; `=` is a static override.
+      let isBinding = false;
+      if (this.match(BacTokenKind.FatArrow)) {
+        isBinding = true;
+      } else if (!this.expect(BacTokenKind.Assign, "'=' or '=>' between property name and value")) {
+        break;
+      }
       const value = this.parseExpr();
       if (!value) { break; }
-      target.defaults.push({ name, value, location });
+      target.defaults.push({ name, value, location, isBinding });
       this.skipNewlines();
       this.match(BacTokenKind.Comma);
     }

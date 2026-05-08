@@ -169,6 +169,10 @@ export interface BacAssignment {
   name:     string;
   value:    BacExpr;
   location: BacSourceLocation;
+  /** UMG widget property binding (`PropName => FuncName`). When true,
+   *  `value` must be an identifier expression naming the BP function
+   *  the property runtime-binds to. */
+  isBinding?: boolean;
 }
 
 export type BacMember =

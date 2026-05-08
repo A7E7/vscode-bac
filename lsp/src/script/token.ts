@@ -72,6 +72,7 @@ export enum BacTokenKind {
 
   // Assignment
   Assign,
+  FatArrow,        // =>  (UMG widget property binding)
   PlusEq,
   MinusEq,
   StarEq,
@@ -168,6 +169,7 @@ const TOKEN_NAMES: Record<BacTokenKind, string> = (() => {
   out[BacTokenKind.At]         = 'at';
   out[BacTokenKind.Question]   = 'question';
   out[BacTokenKind.Assign]     = 'assign';
+  out[BacTokenKind.FatArrow]   = 'fat_arrow';
   out[BacTokenKind.PlusEq]     = 'plus_eq';
   out[BacTokenKind.MinusEq]    = 'minus_eq';
   out[BacTokenKind.StarEq]     = 'star_eq';

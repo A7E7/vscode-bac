@@ -238,7 +238,8 @@ class Lexer {
       case '?': return single(BacTokenKind.Question);
 
       case '=':
-        if (n === '=') { return pair(BacTokenKind.EqEq); }
+        if (n === '=') { return pair(BacTokenKind.EqEq);     }
+        if (n === '>') { return pair(BacTokenKind.FatArrow); }
         return single(BacTokenKind.Assign);
       case '!':
         if (n === '=') { return pair(BacTokenKind.NotEq); }
