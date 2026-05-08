@@ -16,3 +16,7 @@ example.bac
 # VS Code extension build output
 editors/code/out/
 editors/code/*.vsix
+editors/code/server/
+
+# LSP server build output
+lsp/out/

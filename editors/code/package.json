@@ -1,15 +1,16 @@
 {
   "name": "vscode-bac",
   "displayName": "Blueprint as Code (BAC)",
-  "description": "Syntax highlighting, snippets, and language config for .bac scripts that round-trip with Unreal Engine Blueprints.",
-  "version": "0.1.0",
+  "description": "Syntax highlighting, snippets, and diagnostics for .bac scripts that round-trip with Unreal Engine Blueprints.",
+  "version": "0.2.0",
   "publisher": "andreas-eichert",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Programming Languages",
-    "Snippets"
+    "Snippets",
+    "Linters"
   ],
   "keywords": [
     "bac",
@@ -23,6 +24,7 @@
     "type": "git",
     "url": "https://github.com/A7E7/vscode-bac.git"
   },
+  "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
@@ -48,11 +50,46 @@
         "language": "bac",
         "path": "./snippets/bac.code-snippets"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Blueprint as Code",
+      "properties": {
+        "bac.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the BAC linter on .bac files. When false the extension still highlights but produces no diagnostics."
+        },
+        "bac.unrealEditorPath": {
+          "type": "string",
+          "default": "/Users/Shared/Epic Games/UE_5.7/Engine/Binaries/Mac/UnrealEditor-Cmd",
+          "description": "Absolute path to the UnrealEditor-Cmd binary. The linter spawns this to invoke the BlueprintAsCode plugin's `bac.lint` command."
+        },
+        "bac.projectPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a .uproject that loads the BlueprintAsCode plugin. Required for diagnostics — leave blank to disable linting."
+        },
+        "bac.lintTimeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "description": "Hard cap on a single lint invocation (in milliseconds). UE editor startup is ~5s so this should be generous."
+        }
+      }
+    }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "echo 'no extension JS yet — syntax-only'",
-    "package": "vsce package"
+    "vscode:prepublish": "npm run compile && npm run bundle-lsp",
+    "compile": "tsc -p .",
+    "watch": "tsc -p . -w",
+    "bundle-lsp": "rm -rf server && mkdir -p server && cp -R ../../lsp/out/* server/ && cp ../../lsp/package.json server/package.json && (cd server && npm install --omit=dev --no-audit --no-fund --silent)",
+    "package": "vsce package --skip-license"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.5"
   }
 }
