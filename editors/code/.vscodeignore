@@ -1,11 +1,13 @@
 .vscode/**
 .vscode-test/**
-node_modules/**
 src/**
 .gitignore
 .eslintrc*
 tsconfig.json
 *.vsix
+
+# vsce strips devDependencies from node_modules automatically; the runtime
+# dep (vscode-languageclient) needs to ship for the extension to activate.
 
 # We DO want server/** included — that's the bundled LSP.
 !server/**

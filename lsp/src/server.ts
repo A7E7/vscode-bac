@@ -14,9 +14,17 @@
 
 import {
   createConnection, ProposedFeatures, TextDocuments,
+  CompletionItem, CompletionParams,
   Diagnostic, DiagnosticSeverity, DiagnosticRelatedInformation,
   DidChangeConfigurationNotification, InitializeParams, InitializeResult,
   TextDocumentSyncKind,
+  Hover, HoverParams, Definition, DefinitionParams,
+  DocumentSymbol, DocumentSymbolParams,
+  Location, ReferenceParams,
+  DocumentHighlight, DocumentHighlightParams,
+  SignatureHelp, SignatureHelpParams,
+  CodeAction, CodeActionParams, CodeActionKind,
+  TextEdit, DocumentFormattingParams, DocumentRangeFormattingParams, Range,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
@@ -31,6 +39,15 @@ import { BacDiagnostics, BacDiagnostic } from './script/diagnostics';
 import { runContractCheck } from './validate/contract-check';
 import { runReferenceCheck } from './validate/reference-check';
 import { runTypeCheck } from './validate/type-check';
+import { analyzeCursor, findScopeAt, buildCompletionItemsAsync } from './completion/complete';
+import { BacEngineProxy } from './completion/engine-proxy';
+import { buildDocumentSymbols } from './navigation/symbols';
+import { findDefinition } from './navigation/definition';
+import { buildHover } from './navigation/hover';
+import { findReferences, findDocumentHighlights } from './navigation/references';
+import { buildSignatureHelp } from './navigation/signature';
+import { buildCodeActions } from './navigation/code-actions';
+import { formatBacText } from './format/format';
 
 interface BacSettings {
   unrealEditorPath: string;
@@ -69,9 +86,44 @@ interface BacLintResult {
 
 let settings: BacSettings = { ...DEFAULTS };
 
+// Workspace folder roots captured at `initialize` time. Used to auto-detect a
+// `.uproject` when the user hasn't set `bac.projectPath` explicitly.
+let workspaceRoots: string[] = [];
+
+// Last auto-detected `.uproject` path we logged about — guards against
+// spamming the channel on every config refresh.
+let lastAutoDetected: string | undefined;
+
+// Engine proxy: connects to the running editor's completion server when the
+// project path is known. Module-level so completion handlers can reach it.
+let engineProxy:        BacEngineProxy | undefined;
+let engineProxyForPath: string | undefined;  // projectDir the current proxy targets
+
 // ─── Entry point ────────────────────────────────────────────────────────────
-const onceArgIdx = process.argv.indexOf('--once');
-if (onceArgIdx >= 0) {
+const formatIdx       = process.argv.indexOf('--format');
+const onceNoEngineIdx = process.argv.indexOf('--once-no-engine');
+const onceArgIdx      = process.argv.indexOf('--once');
+if (formatIdx >= 0) {
+  const filePath = process.argv[formatIdx + 1];
+  if (!filePath) {
+    process.stderr.write('usage: bac-language-server --format <file.bac>\n');
+    process.exit(2);
+  }
+  runFormat(filePath).catch((err) => {
+    process.stderr.write(`bac format failed: ${(err as Error).message}\n`);
+    process.exit(1);
+  });
+} else if (onceNoEngineIdx >= 0) {
+  const filePath = process.argv[onceNoEngineIdx + 1];
+  if (!filePath) {
+    process.stderr.write('usage: bac-language-server --once-no-engine <file.bac>\n');
+    process.exit(2);
+  }
+  runOnceNoEngine(filePath).catch((err) => {
+    process.stderr.write(`bac AST pass failed: ${(err as Error).message}\n`);
+    process.exit(1);
+  });
+} else if (onceArgIdx >= 0) {
   const filePath = process.argv[onceArgIdx + 1];
   if (!filePath) {
     process.stderr.write('usage: bac-language-server --once <file.bac>\n');
@@ -85,7 +137,23 @@ if (onceArgIdx >= 0) {
   startLspServer();
 }
 
-// ─── CLI mode ───────────────────────────────────────────────────────────────
+// ─── CLI mode (formatter, no UE) ────────────────────────────────────────────
+//
+// Reads a `.bac` file, prints the formatted output to stdout, exits 0 on
+// clean format. Use it in pre-commit hooks, AI agent loops, and CI.
+async function runFormat(filePath: string): Promise<void> {
+  let source: string;
+  try {
+    source = await fsp.readFile(filePath, 'utf8');
+  } catch (err) {
+    process.stderr.write(`bac: cannot read ${filePath}: ${(err as Error).message}\n`);
+    process.exit(2);
+  }
+  process.stdout.write(formatBacText(source));
+  process.exit(0);
+}
+
+// ─── CLI mode (engine-coupled, full bac.lint UE roundtrip) ──────────────────
 async function runOnce(filePath: string): Promise<void> {
   if (!settings.projectPath) {
     process.stderr.write(
@@ -96,6 +164,45 @@ async function runOnce(filePath: string): Promise<void> {
   const result = await invokeCommandlet(filePath);
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   process.exit(result.ok ? 0 : 1);
+}
+
+// ─── CLI mode (AST-only, no UE) ────────────────────────────────────────────
+//
+// Same JSON shape as `--once` but runs only the TS validator passes. Use this
+// in CI / AI agent loops that don't have a UE install or want sub-100ms
+// turnaround. It catches everything in BAC1xxx (parser), BAC22xx (reference),
+// and BAC23xx (type/contract) — i.e. ~80% of the diagnostics surface, missing
+// only the engine-coupled identifier checks (BAC2310/2311 from BacIdentifierCheck).
+async function runOnceNoEngine(filePath: string): Promise<void> {
+  let source: string;
+  try {
+    source = await fsp.readFile(filePath, 'utf8');
+  } catch (err) {
+    process.stderr.write(`bac: cannot read ${filePath}: ${(err as Error).message}\n`);
+    process.exit(2);
+  }
+  const diags  = new BacDiagnostics();
+  const tokens = tokenize(source, diags);
+  const ast    = parse(tokens, diags);
+  runContractCheck(ast, diags);
+  runReferenceCheck(ast, diags);
+  runTypeCheck(ast, diags);
+  const out = {
+    ok:           !diags.items.some((d) => d.severity === 'error'),
+    mode:         'ast-only',
+    diagnostics:  diags.items.map((d) => ({
+      severity: d.severity,
+      code:     d.code,
+      message:  d.message,
+      line:     d.location.line,
+      column:   d.location.column,
+      offset:   d.location.offset,
+      hint:     d.hint,
+      fixes:    d.fixes,
+    })),
+  };
+  process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+  process.exit(out.ok ? 0 : 1);
 }
 
 // ─── LSP mode ───────────────────────────────────────────────────────────────
@@ -130,15 +237,42 @@ function startLspServer(): void {
     return s;
   };
 
-  connection.onInitialize((_params: InitializeParams): InitializeResult => ({
-    capabilities: {
-      textDocumentSync: {
-        openClose: true,
-        change:    TextDocumentSyncKind.Incremental,
-        save:      { includeText: false },
+  connection.onInitialize((params: InitializeParams): InitializeResult => {
+    workspaceRoots = collectRootsFromInitParams(params);
+    return {
+      capabilities: {
+        textDocumentSync: {
+          openClose: true,
+          change:    TextDocumentSyncKind.Incremental,
+          save:      { includeText: false },
+        },
+        completionProvider: {
+          // `.` opens member-access completion. Identifier characters are
+          // handled implicitly — the client invokes completion on each
+          // letter and we filter by prefix in `buildCompletionItems`.
+          triggerCharacters: ['.'],
+          resolveProvider:   false,
+        },
+        hoverProvider:             true,
+        definitionProvider:        true,
+        documentSymbolProvider:    true,
+        referencesProvider:        true,
+        documentHighlightProvider: true,
+        signatureHelpProvider: {
+          // `(` opens, `,` advances active parameter; `)` doesn't trigger
+          // because the help should disappear when the call closes.
+          triggerCharacters:   ['(', ','],
+          retriggerCharacters: [','],
+        },
+        codeActionProvider: {
+          codeActionKinds: [CodeActionKind.QuickFix],
+          resolveProvider: false,
+        },
+        documentFormattingProvider:      true,
+        documentRangeFormattingProvider: true,
       },
-    },
-  }));
+    };
+  });
 
   connection.onInitialized(async () => {
     await connection.client.register(DidChangeConfigurationNotification.type, undefined);
@@ -184,8 +318,134 @@ function startLspServer(): void {
     connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
   });
 
+  // textDocument/completion — TS-side passes always run (cheap); the engine
+  // proxy is consulted for member-access on a known type when an editor is
+  // attached. Re-parses the doc on each request so we work against live text.
+  connection.onCompletion(async (params: CompletionParams): Promise<CompletionItem[]> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return []; }
+    const text   = doc.getText();
+    const offset = doc.offsetAt(params.position);
+    const ctx    = analyzeCursor(text, offset);
+    const scriptAst = parseDoc(text);
+    const scope  = findScopeAt(scriptAst, offset);
+    return buildCompletionItemsAsync(ctx, scope, engineProxy);
+  });
+
+  // textDocument/hover — markdown popup with type info / decorators / engine
+  // tooltips. Uses the same engine proxy as completion for inherited members.
+  connection.onHover(async (params: HoverParams): Promise<Hover | undefined> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return undefined; }
+    const text   = doc.getText();
+    const offset = doc.offsetAt(params.position);
+    return buildHover({ text, ast: parseDoc(text), offset, proxy: engineProxy });
+  });
+
+  // textDocument/definition — F12 / Cmd-click. TS-only resolver: jumps to
+  // params, locals, and class members declared in the same .bac file.
+  connection.onDefinition((params: DefinitionParams): Definition | undefined => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return undefined; }
+    const text   = doc.getText();
+    const offset = doc.offsetAt(params.position);
+    return findDefinition({ uri: doc.uri, text, ast: parseDoc(text), offset });
+  });
+
+  // textDocument/documentSymbol — outline view + breadcrumb.
+  connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return []; }
+    const text = doc.getText();
+    return buildDocumentSymbols(parseDoc(text), text);
+  });
+
+  // textDocument/references — Shift+F12. Same-file only for now (no
+  // multi-document index). Name-based; doesn't yet honor scope shadowing.
+  connection.onReferences((params: ReferenceParams): Location[] => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return []; }
+    const text   = doc.getText();
+    const offset = doc.offsetAt(params.position);
+    return findReferences({
+      uri:    doc.uri,
+      text,
+      ast:    parseDoc(text),
+      offset,
+      includeDeclaration: params.context?.includeDeclaration ?? true,
+    });
+  });
+
+  // textDocument/documentHighlight — soft highlight of all occurrences when
+  // the cursor sits on an identifier (read/write/decl distinction kept).
+  connection.onDocumentHighlight((params: DocumentHighlightParams): DocumentHighlight[] => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return []; }
+    const text   = doc.getText();
+    const offset = doc.offsetAt(params.position);
+    return findDocumentHighlights({ uri: doc.uri, text, ast: parseDoc(text), offset });
+  });
+
+  // textDocument/signatureHelp — parameter hints inside an open call.
+  // Triggers on `(` and `,`. Engine path mirrors hover/completion: resolve
+  // receiver type, ask the proxy, render with the active param highlighted.
+  connection.onSignatureHelp(async (params: SignatureHelpParams): Promise<SignatureHelp | undefined> => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return undefined; }
+    const text   = doc.getText();
+    const offset = doc.offsetAt(params.position);
+    return buildSignatureHelp({ text, ast: parseDoc(text), offset, proxy: engineProxy });
+  });
+
+  // textDocument/codeAction — surface diagnostic `fixes` as quick-fixes.
+  // The fixes were stuffed into `Diagnostic.data` at publish time so we can
+  // resurrect them here without re-running the validator.
+  connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return []; }
+    const text = doc.getText();
+    return buildCodeActions({
+      uri:         doc.uri,
+      text,
+      diagnostics: params.context.diagnostics,
+    });
+  });
+
+  // textDocument/formatting — opinionated format-document. We always
+  // replace the whole document with the formatted text; partial-range
+  // formatting falls back to the same (formatting just a fragment isn't
+  // meaningful for a language whose layout is canonical).
+  connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return []; }
+    return [whole(doc, formatBacText(doc.getText()))];
+  });
+  connection.onDocumentRangeFormatting((params: DocumentRangeFormattingParams): TextEdit[] => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc || doc.languageId !== 'bac') { return []; }
+    return [whole(doc, formatBacText(doc.getText()))];
+  });
+
   documents.listen(connection);
   connection.listen();
+}
+
+function whole(doc: TextDocument, formatted: string): TextEdit {
+  const fullRange: Range = {
+    start: { line: 0, character: 0 },
+    end:   doc.positionAt(doc.getText().length),
+  };
+  return { range: fullRange, newText: formatted };
+}
+
+// Tokenize + parse helper used by the navigation handlers (hover, definition,
+// document symbols). They don't need diagnostics — the AST itself is enough —
+// but we still feed a transient `BacDiagnostics` because the lexer/parser
+// signal recoverable errors through it.
+function parseDoc(text: string): import('./script/ast').BacScriptAst {
+  const diags  = new BacDiagnostics();
+  const tokens = tokenize(text, diags);
+  return parse(tokens, diags);
 }
 
 // ─── AST-only passes (didOpen / didChange) ─────────────────────────────────
@@ -228,6 +488,80 @@ async function refreshSettings(connection: ReturnType<typeof createConnection>):
   } catch {
     settings = { ...DEFAULTS };
   }
+  // If the user hasn't set `bac.projectPath` (and the env var didn't fill it),
+  // try to find a `.uproject` at the top level of any workspace folder. The
+  // explicit setting and the env var both still win.
+  if (!settings.projectPath && workspaceRoots.length > 0) {
+    const found = await findUprojectInRoots(workspaceRoots, connection);
+    if (found) {
+      settings.projectPath = found;
+      if (lastAutoDetected !== found) {
+        connection.console.info(`bac: auto-detected project at ${found}`);
+        lastAutoDetected = found;
+      }
+    }
+  }
+  ensureEngineProxy(connection);
+}
+
+function ensureEngineProxy(connection: ReturnType<typeof createConnection>): void {
+  const projectDir = settings.projectPath ? path.dirname(settings.projectPath) : undefined;
+  if (engineProxy && engineProxyForPath === projectDir) { return; }
+  if (engineProxy) {
+    engineProxy.dispose();
+    engineProxy = undefined;
+    engineProxyForPath = undefined;
+  }
+  if (!projectDir) { return; }
+  engineProxy = new BacEngineProxy({
+    projectDir,
+    log: (level, msg) => {
+      if (level === 'error')      { connection.console.error(msg); }
+      else if (level === 'warn')  { connection.console.warn(msg);  }
+      else                        { connection.console.info(msg);  }
+    },
+  });
+  engineProxy.start();
+  engineProxyForPath = projectDir;
+}
+
+function collectRootsFromInitParams(params: InitializeParams): string[] {
+  const roots: string[] = [];
+  if (params.workspaceFolders) {
+    for (const f of params.workspaceFolders) {
+      const p = URI.parse(f.uri).fsPath;
+      if (p) { roots.push(p); }
+    }
+  }
+  if (roots.length === 0 && params.rootUri) {
+    const p = URI.parse(params.rootUri).fsPath;
+    if (p) { roots.push(p); }
+  }
+  return roots;
+}
+
+async function findUprojectInRoots(
+  roots: string[],
+  connection: ReturnType<typeof createConnection>,
+): Promise<string | undefined> {
+  const matches: string[] = [];
+  for (const root of roots) {
+    try {
+      const entries = await fsp.readdir(root);
+      for (const e of entries) {
+        if (e.endsWith('.uproject')) { matches.push(path.join(root, e)); }
+      }
+    } catch { /* unreadable root — ignore */ }
+  }
+  if (matches.length === 0) { return undefined; }
+  if (matches.length > 1) {
+    connection.console.warn(
+      `bac: found ${matches.length} .uproject files in workspace ` +
+      `(${matches.join(', ')}); using ${matches[0]}. ` +
+      `Set 'bac.projectPath' explicitly to override.`,
+    );
+  }
+  return matches[0];
 }
 
 async function runEngineLint(
@@ -304,6 +638,9 @@ function toLspDiagnosticFromBac(d: BacDiagnostic): Diagnostic {
     message:  tail ? `${d.message}\n${tail}` : d.message,
     source:   'bac',
     relatedInformation: related,
+    // Stash hint + fixes so the code-action handler can resurrect them
+    // without re-running the validator. Shape: BacDiagnosticData.
+    data:     d.hint || d.fixes ? { hint: d.hint, fixes: d.fixes } : undefined,
   };
 }
 
@@ -342,6 +679,9 @@ function toLspDiagnostic(d: BacDiagnostic_LintWire): Diagnostic {
     message:  tail ? `${d.message}\n${tail}` : d.message,
     source:   'bac',
     relatedInformation: related,
+    // Same payload as the AST path so the code-action handler doesn't have
+    // to know which pipeline produced the diagnostic.
+    data:     d.hint || d.fixes ? { hint: d.hint, fixes: d.fixes } : undefined,
   };
 }
 

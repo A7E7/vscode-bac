@@ -99,35 +99,80 @@ Then in VS Code: open Settings → search "BAC" and set:
 
 ## CLI mode (for CI / AI agents)
 
-The same language-server binary doubles as a one-shot linter:
+The same language-server binary doubles as a one-shot linter and formatter:
 
 ```bash
+# AST-only lint — ~80ms, no UE install needed. Catches BAC1xxx (parser),
+# BAC22xx (reference), and BAC23xx (type/contract) — ~80% of the diagnostic
+# surface. Best for tight AI agent loops.
+node lsp/out/server.js --once-no-engine script.bac
+
+# Engine-coupled lint — ~5s, spawns UnrealEditor-Cmd to run `bac.lint` and
+# adds identifier-resolution checks (BAC2310/2311 from BacIdentifierCheck)
+# that need engine reflection.
 BAC_PROJECT_PATH=/path/to/MyGame.uproject \
   node lsp/out/server.js --once script.bac
+
+# Format — opinionated, no config, idempotent. Prints to stdout.
+node lsp/out/server.js --format script.bac
 ```
 
-Prints `{ "ok": bool, "diagnostics": [...] }` to stdout and exits non-zero on
-errors. Diagnostic codes (`BAC2310`, `BAC2311`, …) are stable, so AI agents
-can pattern-match on them deterministically rather than parsing free-form
-text.
+Lint flavors print `{ "ok": bool, "diagnostics": [...] }` to stdout and exit
+non-zero on errors. Diagnostic codes (`BAC2310`, `BAC2311`, …) are stable,
+so AI agents can pattern-match on them deterministically rather than parsing
+free-form text.
+
+For a Prettier-native integration, install the standalone
+[`prettier-plugin-bac`](https://github.com/A7E7/prettier-plugin-bac) package
+and use the regular `prettier --write '**/*.bac'` flow — same formatter,
+same output.
 
 ## Status
 
+**Editor & language**
 - ✅ Tree-sitter grammar — parses 68 / 68 BlueprintAsCode corpus fixtures + the `HealthPickup.bac` example
 - ✅ Highlight queries (`queries/highlights.scm`) — covers every node kind
 - ✅ TextMate grammar (`syntaxes/bac.tmLanguage.json`) — VS Code highlighting
 - ✅ Language configuration — comments, brackets, auto-indent, surround pairs
 - ✅ Snippets — class / function / event / component / if-let / for-each / await / RepNotify
+
+**Diagnostics**
 - ✅ TS port of AST-only validator passes — keystroke-time diagnostics for everything that doesn't need engine reflection (contract / reference / type checks). 12/12 `Validate_*` corpus fixtures emit the expected BAC codes
 - ✅ LSP server — wraps the plugin's `bac.lint` UE exec command, surfaces engine-coupled diagnostics on save; merges with TS-side diagnostics (TS runs every change, UE on save, deduped by code+location)
-- ✅ CLI mode — `node lsp/out/server.js --once <file.bac>` prints structured JSON for CI / AI agents
-- ⏳ Future: a `--once` mode that runs only the AST passes (no UE) for the fully-offline AI feedback loop
+- ✅ Auto-detect `.uproject` from the active workspace — only set `bac.projectPath` if you want to override
+
+**IDE features (LSP)**
+- ✅ **Completion** — TS-side identifiers (params, locals, components, script funcs/events) at keystroke time. Engine-coupled member access (`Mesh.<TAB>`) queries the running editor through a local socket and lists the receiver's BlueprintCallable functions + Blueprint-visible properties. Falls back to TS-only when no editor is open
+- ✅ **Hover** — markdown popup with type info, decorators, function signatures; engine members come through with their UE tooltips
+- ✅ **Goto Definition** — F12 / Cmd-click navigates to params, locals, and class members
+- ✅ **Document Symbols** — outline view + breadcrumb show class structure
+- ✅ **Find References** — Shift+F12 locates all uses, distinguishing reads / writes / decls
+- ✅ **Document Highlight** — soft highlights of every same-name occurrence as you click around
+- ✅ **Signature Help** — parameter hints inside open calls; engine path resolves UFUNCTIONs through the proxy
+- ✅ **Code Actions** — diagnostic fixes surfaced as quick-fixes (lightbulb menu); single-keystroke apply
+- ✅ **Formatter** — opinionated, idempotent, no config; format-on-save in VS Code; also available as `--format` CLI and as the standalone [prettier-plugin-bac](https://github.com/A7E7/prettier-plugin-bac) npm package
+
+**CI / agents**
+- ✅ Engine-coupled CLI — `node lsp/out/server.js --once <file.bac>` runs the full validator including `bac.lint`. Spawns UE, ~5s.
+- ✅ AST-only CLI — `node lsp/out/server.js --once-no-engine <file.bac>` runs only the TS validator passes (BAC1xxx parser, BAC22xx reference, BAC23xx type/contract). ~80ms cold. Use this in AI agent loops without a UE install.
+
+## Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — internal structure, data flow,
+  what's owned here vs in the plugin, key design choices.
+- **[CHANGELOG.md](CHANGELOG.md)** — version history with wire-stable
+  contracts called out.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — routing table for which issues
+  belong here vs in the plugin repo, plus grammar-change checklist.
+- **[CLAUDE.md](CLAUDE.md)** — instructions Claude Code reads automatically
+  in this repo.
 
 ## Contributing
 
 Grammar and highlight tweaks are welcome — please open issues / PRs against
 `grammar.js`, the highlight query, or the TextMate grammar. The corpus tests
-under `test/corpus/` should grow with any structural change.
+under `test/corpus/` should grow with any structural change. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the routing table.
 
 For diagnostics or generator/transcriber behaviour, please file issues against
 the [BlueprintAsCode][plugin] plugin instead — that's where the validator
