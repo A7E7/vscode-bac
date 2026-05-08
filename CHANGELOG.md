@@ -12,6 +12,23 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — code-action quick fixes for `add X before Y` + bidirectional anchor search
+- `BAC2240` (replicated decorator missing class-level `@replicated_default`)
+  was emitting a candidate fix the LSP couldn't translate to a clickable
+  Quick Fix. The fix string follows an `add \`X\` before \`Y\`` shape that
+  the original code-action handler didn't parse — silently dropped.
+  Now produces a workspace insert that drops the new line above the
+  anchor with matching indentation.
+- `findInWindow` (the anchor locator) now searches a bidirectional
+  4-line window around the diagnostic instead of forward-only. BAC2240
+  fires on the `@replicated` line but its anchor (`class X`) sits one
+  line above; the old forward-only search missed it. Closest occurrence
+  to the diagnostic line wins on ambiguity.
+- Smoke-tested both supported patterns end-to-end:
+  - `BAC2200` (attach typo) → in-place replace, 0 regressions.
+  - `BAC2240` → insert at line start, indent matches anchor's line.
+- Parity test: 13/16 PASS (unchanged).
+
 ### Added — Widget Blueprint compatibility, Phase 4 (BindWidget + UMG events)
 - New decorators `@bind_widget` and `@bind_widget_optional` accepted
   on var declarations by the contract-check pass. Mirrors the plugin
