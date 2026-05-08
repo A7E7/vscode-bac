@@ -178,7 +178,7 @@ export interface BacAssignment {
 export type BacMember =
   | BacVariableDecl | BacComponentDecl | BacFunctionDecl
   | BacEventDecl    | BacConstructionDecl | BacWidgetDecl
-  | BacMacroDecl;
+  | BacMacroDecl    | BacDefaultsBlock;
 
 interface BacMemberBase {
   location:   BacSourceLocation;
@@ -231,6 +231,15 @@ export interface BacMacroDecl extends BacMemberBase {
   params:      BacParam[];
   returnType?: BacTypeRef;
   body:        BacBlockStmt;
+}
+/**
+ * `defaults { Property = Expression … }` — class-scope CDO overrides.
+ * Each assignment routes through FProperty::ImportText into the BPGC's
+ * class default object on the engine side. Mirrors the C++ FBacDefaultsBlock.
+ */
+export interface BacDefaultsBlock extends BacMemberBase {
+  kind:        'defaults';
+  assignments: BacAssignment[];
 }
 
 // ─── Top level ──────────────────────────────────────────────────────────────

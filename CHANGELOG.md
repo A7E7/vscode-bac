@@ -12,6 +12,20 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `defaults { … }` class-scope CDO overrides (member-keyword mirror)
+- New `Kw_Defaults` token + `BacDefaultsBlock` AST + `parseDefaultsBlock`
+  mirroring the C++ parser. Body shape: `Property = Expression` per
+  line, optional comma separator, terminated by `}` — same shape the
+  component default-overrides body already uses.
+- Navigation, hover, references, symbols, and contract-check all learn
+  the new member kind so the IDE no longer flags `defaults { ... }` as
+  `BAC1021` (wrong member kind). Defaults blocks are anonymous (no
+  `name`) so they're filtered out of name-based lookups.
+- Wire-stable mirror, atomic with BAC plugin commit badd525. Engine
+  routes each assignment through `FProperty::ImportText_Direct` into
+  the BPGC's class default object after compile; transcriber walks the
+  CDO and emits any property diverging from the parent's default.
+
 ### Added — `@macro_library` class decorator (gap 1b Phase 1)
 - Contract-check accepts `@macro_library` as a class-only zero-arg
   decorator alongside `@blueprintable`. The plugin generator flips

@@ -229,6 +229,10 @@ function formatClassMember(m: ast.BacMember): string {
         decoratorsBlock,
       ].filter(Boolean).join('\n');
     }
+    case 'defaults': {
+      const n = m.assignments.length;
+      return `\`defaults\` block (${n} CDO override${n === 1 ? '' : 's'})`;
+    }
   }
 }
 

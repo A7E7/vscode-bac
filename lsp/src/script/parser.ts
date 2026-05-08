@@ -287,13 +287,43 @@ class Parser {
       case BacTokenKind.Kw_Construction: return this.parseConstructionDecl(decorators);
       case BacTokenKind.Kw_Widget:       return this.parseWidgetDecl(decorators);
       case BacTokenKind.Kw_Macro:        return this.parseMacroDecl(decorators);
+      case BacTokenKind.Kw_Defaults:     return this.parseDefaultsBlock(decorators);
       default: {
         this.error(
-          `Expected class member (var, component, function, event, construction, widget, macro) but got '${tokenKindName(this.current().kind)}'.`,
+          `Expected class member (var, component, function, event, construction, widget, macro, defaults) but got '${tokenKindName(this.current().kind)}'.`,
           this.current().location, 'BAC1021');
         return undefined;
       }
     }
+  }
+
+  // `defaults { Property = Expression … }` — class-scope CDO overrides.
+  // Body shape mirrors the component default-overrides body (one
+  // `Name = Expr` per line, optional trailing comma, terminated by `}`).
+  // Decorators are accepted but currently ignored — the engine has no
+  // per-defaults-block decorator yet.
+  private parseDefaultsBlock(decorators: ast.BacDecorator[]): ast.BacDefaultsBlock {
+    const out: ast.BacDefaultsBlock = {
+      kind: 'defaults', location: this.current().location, decorators,
+      assignments: [],
+    };
+    this.advance(); // 'defaults'
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open defaults body")) { return out; }
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+      const location = this.current().location;
+      const name = this.expectAssignmentName('class default property name');
+      if (!name) { break; }
+      if (!this.expect(BacTokenKind.Assign, "'=' after class default property name")) { break; }
+      const value = this.parseExpr();
+      if (!value) { break; }
+      out.assignments.push({ name, value, location });
+      this.skipNewlines();
+      this.match(BacTokenKind.Comma);
+    }
+    this.expect(BacTokenKind.RBrace, "'}' to close defaults body");
+    return out;
   }
 
   private parseVariableDecl(decorators: ast.BacDecorator[]): ast.BacVariableDecl {

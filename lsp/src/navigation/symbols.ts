@@ -73,13 +73,18 @@ function symbolForMember(m: ast.BacMember, range: Range, sel: Range): DocumentSy
       return { name: m.name, detail: formatEventDetail(m),          kind: SymbolKind.Event,       range, selectionRange: sel };
     case 'construction':
       return { name: '(construction)', detail: undefined,           kind: SymbolKind.Constructor, range, selectionRange: sel };
+    case 'defaults':
+      return { name: '(defaults)',     detail: undefined,           kind: SymbolKind.Object,      range, selectionRange: sel };
   }
 }
 
 function nameOf(m: ast.BacMember): string | undefined {
   switch (m.kind) {
-    case 'construction': return undefined;
-    default:             return m.name;
+    case 'construction':
+    case 'defaults':
+      return undefined;
+    default:
+      return m.name;
   }
 }
 
