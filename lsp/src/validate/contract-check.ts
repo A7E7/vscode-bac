@@ -90,7 +90,9 @@ function emitUnknownArg(out: BacDiagnostics, d: ast.BacDecorator, argName: strin
 function validateDecorator(d: ast.BacDecorator, target: Target, out: BacDiagnostics): void {
   switch (d.name) {
     case 'editable':
-    case 'readonly': {
+    case 'readonly':
+    case 'bind_widget':
+    case 'bind_widget_optional': {
       if (target !== 'variable') { emitWrongTarget(out, d, target, 'var'); return; }
       if (d.args.length !== 0) { emitBadArity(out, d, 0, d.args.length); }
       return;

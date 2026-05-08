@@ -12,6 +12,22 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Widget Blueprint compatibility, Phase 4 (BindWidget + UMG events)
+- New decorators `@bind_widget` and `@bind_widget_optional` accepted
+  on var declarations by the contract-check pass. Mirrors the plugin
+  side rules: var-only target, zero arguments. The plugin generator
+  writes the matching metadata into the `FBPVariableDescription`'s
+  `MetaDataArray` for UMG's auto-wire pass to consume.
+- No AST shape change — decorators are already a `name + args` list,
+  so adding two new accepted names is a one-line cases addition in
+  the decorator switch.
+- UMG event vocabulary (Construct, Tick, OnPaint, …) round-trips
+  through the existing `event` path with no special case — the
+  generator/transcriber resolve the parent UFUNCTION by name.
+- UMG Animations deferred to Phase 4b — they're sub-assets and need
+  a `.uasset` reference similar to Material Instance, not inline
+  data.
+
 ### Added — Widget Blueprint compatibility, Phase 3 (property bindings)
 - New `FatArrow` token (`=>`); lexer extends the `=` case to emit it.
   Wire-stable parser change atomic with BAC plugin commit. The plugin
