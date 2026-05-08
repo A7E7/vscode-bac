@@ -47,6 +47,18 @@ export interface EngineTypeMembers {
   properties:        EngineProperty[];
 }
 
+export interface EngineStructField {
+  name:       string;
+  type:       string;
+  isExposed:  boolean;
+  doc?:       string;
+}
+
+export interface EngineStructMembers {
+  resolvedStructName: string;
+  fields:             EngineStructField[];
+}
+
 interface PendingRequest {
   resolve: (resp: unknown) => void;
   reject:  (err: Error)    => void;
@@ -92,6 +104,9 @@ export class BacEngineProxy {
   private nextRequestId           = 0;
   private readonly pending         = new Map<string, PendingRequest>();
   private readonly typeCache       = new Map<string, EngineTypeMembers>();
+  // Stores `null` for known-not-a-struct names so signatureHelp doesn't
+  // re-request them for every keystroke. Absent = "not yet probed".
+  private readonly structCache     = new Map<string, EngineStructMembers | null>();
   private receiveBuffer            = '';
   private disposed                 = false;
 
@@ -140,6 +155,32 @@ export class BacEngineProxy {
       return body;
     } catch (err) {
       this.opts.log('warn', `bac engine: complete-type(${className}) failed: ${(err as Error).message}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Returns the field schema for a UScriptStruct, or undefined if not
+   * reachable / not a struct. Negative results are cached as `null` so
+   * repeated signatureHelp / validation calls on a non-struct name (a
+   * regular function call) don't keep round-tripping to the engine.
+   */
+  async completeStruct(structName: string): Promise<EngineStructMembers | undefined> {
+    const cached = this.structCache.get(structName);
+    if (cached === null)      { return undefined; }   // known not-a-struct
+    if (cached !== undefined) { return cached;     }  // known struct
+    if (!this.isConnected()) {
+      await this.tryDiscover();
+      if (!this.isConnected()) { return undefined; }
+    }
+    try {
+      const resp = await this.request({ op: 'complete-struct', structName });
+      const body = (resp as { result?: EngineStructMembers }).result;
+      this.structCache.set(structName, body ?? null);
+      return body;
+    } catch (err) {
+      // Don't cache on hard errors (network / timeout) — let it retry next time.
+      this.opts.log('warn', `bac engine: complete-struct(${structName}) failed: ${(err as Error).message}`);
       return undefined;
     }
   }
@@ -198,6 +239,7 @@ export class BacEngineProxy {
     }
     this.pending.clear();
     this.typeCache.clear();
+    this.structCache.clear();
     this.connectedPort = undefined;
     if (this.socket) {
       this.socket.removeAllListeners();

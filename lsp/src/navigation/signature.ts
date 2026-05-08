@@ -25,7 +25,7 @@ import {
   SignatureHelp, SignatureInformation, ParameterInformation,
 } from 'vscode-languageserver/node';
 import * as ast from '../script/ast';
-import { BacEngineProxy, EngineFunction, EngineTypeMembers } from '../completion/engine-proxy';
+import { BacEngineProxy, EngineFunction, EngineStructMembers, EngineTypeMembers } from '../completion/engine-proxy';
 
 export interface SignatureContext {
   text:   string;
@@ -47,6 +47,22 @@ export async function buildSignatureHelp(ctx: SignatureContext): Promise<Signatu
         signatures: [signatureFromScriptMember(m)],
         activeSignature: 0,
         activeParameter: clampActive(callCtx.argIndex, m.params.length),
+      };
+    }
+  }
+
+  // ── Struct-literal path ─────────────────────────────────────────────────
+  // `Vector(x, y, z)`, `Box(...)`, user-defined struct literals — anything
+  // whose callee resolves to a UScriptStruct via the engine. Tried before
+  // the UClass lookup because struct names and function names share a flat
+  // namespace and the schema is what users want field hints for.
+  if (ctx.proxy && !callCtx.receiver) {
+    const structSchema = await ctx.proxy.completeStruct(callCtx.funcName);
+    if (structSchema) {
+      return {
+        signatures: [signatureFromEngineStruct(structSchema)],
+        activeSignature: 0,
+        activeParameter: clampActive(callCtx.argIndex, structSchema.fields.length),
       };
     }
   }
@@ -201,6 +217,30 @@ function signatureFromScriptMember(m: ast.BacFunctionDecl | ast.BacEventDecl): S
     label,
     parameters:    paramInfo,
     documentation: undefined,
+  };
+}
+
+function signatureFromEngineStruct(s: EngineStructMembers): SignatureInformation {
+  const head     = `${s.resolvedStructName}(`;
+  let label      = head;
+  const paramInfo: ParameterInformation[] = [];
+  for (let i = 0; i < s.fields.length; i++) {
+    const f     = s.fields[i];
+    const piece = `${f.name}: ${f.type}`;
+    const start = label.length;
+    label += piece;
+    paramInfo.push({
+      label: [start, start + piece.length],
+      ...(f.doc ? { documentation: { kind: 'markdown', value: f.doc } } : {}),
+    });
+    if (i < s.fields.length - 1) { label += ', '; }
+  }
+  label += ')';
+
+  return {
+    label,
+    parameters: paramInfo,
+    documentation: { kind: 'markdown', value: `*Struct literal* — \`${s.resolvedStructName}\`` },
   };
 }
 

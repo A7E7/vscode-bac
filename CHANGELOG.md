@@ -12,6 +12,20 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Struct schema reflection (`completeStruct` engine-proxy method)
+- New proxy method consumes the plugin's `complete-struct` NDJSON op so
+  the LSP can introspect any `UScriptStruct` (built-in or user-defined).
+  Negative cache keyed on the struct name avoids re-querying for normal
+  function calls that look like type names — first probe finalises.
+- **Signature help** for struct-literal calls — typing `Vector(<TAB>` /
+  `Box(<TAB>` / any user-defined struct constructor surfaces the field
+  list as a parameter signature with field types + UE tooltips. Matches
+  the existing UFUNCTION signature path; struct probe runs first because
+  struct names and function names share a flat namespace and the schema
+  is what users want hints for.
+- Wire-stable contract: matches the plugin's `complete-struct` shape;
+  diverging would silently break field hints.
+
 ### Changed — sync diagnostic accumulation
 - The LSP now stores sync diagnostics per `(URI, code)` instead of one
   per URI. Two real cases drove this:
