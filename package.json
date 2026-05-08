@@ -1,0 +1,28 @@
+{
+  "name": "tree-sitter-bac",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for BAC (Blueprint as Code) — TypeScript-flavoured DSL that round-trips with Unreal Engine Blueprints.",
+  "main": "bindings/node",
+  "keywords": [
+    "parser",
+    "tree-sitter",
+    "bac",
+    "blueprint",
+    "unreal",
+    "ue5"
+  ],
+  "license": "MIT",
+  "author": "Andreas Eichert",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/A7E7/vscode-bac.git"
+  },
+  "scripts": {
+    "build": "tree-sitter generate",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.24.4"
+  }
+}

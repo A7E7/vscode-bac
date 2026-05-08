@@ -1,0 +1,81 @@
+==================
+Empty class
+==================
+
+class X : Object {}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body)))
+
+==================
+Class with var, component, function, event
+==================
+
+class Pickup : Actor {
+  var Health: int = 100
+  component Root: SceneComponent
+  function Heal(amount: int) {}
+  event BeginPlay() {}
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (variable_decl
+        name: (identifier)
+        type: (type_ref base: (identifier))
+        default: (integer_literal))
+      (component_decl
+        name: (identifier)
+        type: (type_ref base: (identifier)))
+      (function_decl
+        name: (identifier)
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        body: (block))
+      (event_decl
+        name: (identifier)
+        body: (block)))))
+
+==================
+Replicated class with RepNotify var
+==================
+
+@replicated_default(replicates=true)
+class T : Actor {
+  @replicated(repnotify = OnRep_Foo)
+  var Foo: int = 0
+
+  function OnRep_Foo() {}
+}
+
+---
+
+(source_file
+  (decorator
+    name: (identifier)
+    (decorator_arg name: (identifier) value: (bool_literal)))
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (variable_decl
+        (decorator
+          name: (identifier)
+          (decorator_arg name: (identifier) value: (identifier)))
+        name: (identifier)
+        type: (type_ref base: (identifier))
+        default: (integer_literal))
+      (function_decl
+        name: (identifier)
+        body: (block)))))

@@ -1,0 +1,18 @@
+# Tree-sitter generated parser sources are committed (downstream consumers want
+# them) but anything else generated stays local.
+node_modules/
+build/
+*.log
+
+# Editor tooling
+.vscode/
+.idea/
+.DS_Store
+
+# Local highlight tests
+example.bac
+*.html
+
+# VS Code extension build output
+editors/code/out/
+editors/code/*.vsix

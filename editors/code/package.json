@@ -1,0 +1,58 @@
+{
+  "name": "vscode-bac",
+  "displayName": "Blueprint as Code (BAC)",
+  "description": "Syntax highlighting, snippets, and language config for .bac scripts that round-trip with Unreal Engine Blueprints.",
+  "version": "0.1.0",
+  "publisher": "andreas-eichert",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "bac",
+    "blueprint",
+    "unreal",
+    "ue5",
+    "ue"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/A7E7/vscode-bac.git"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "bac",
+        "aliases": ["BAC", "Blueprint as Code", "bac"],
+        "extensions": [".bac"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/bac-file-light.svg",
+          "dark": "./icons/bac-file-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bac",
+        "scopeName": "source.bac",
+        "path": "./syntaxes/bac.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "bac",
+        "path": "./snippets/bac.code-snippets"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "echo 'no extension JS yet — syntax-only'",
+    "package": "vsce package"
+  }
+}

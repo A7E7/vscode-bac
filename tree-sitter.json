@@ -1,0 +1,35 @@
+{
+  "grammars": [
+    {
+      "name": "bac",
+      "camelcase": "Bac",
+      "scope": "source.bac",
+      "path": ".",
+      "file-types": [
+        "bac"
+      ],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for BAC (Blueprint as Code) — TypeScript-flavoured DSL that round-trips with Unreal Engine Blueprints.",
+    "authors": [
+      {
+        "name": "Andreas Eichert"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/A7E7/vscode-bac.git"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": true,
+    "node": true,
+    "python": true,
+    "rust": true,
+    "swift": true
+  }
+}

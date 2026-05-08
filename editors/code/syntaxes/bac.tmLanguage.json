@@ -1,0 +1,253 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "BAC",
+  "scopeName": "source.bac",
+  "fileTypes": ["bac"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#decorators" },
+    { "include": "#class-keyword" },
+    { "include": "#member-keywords" },
+    { "include": "#control-keywords" },
+    { "include": "#async-keyword" },
+    { "include": "#self-keywords" },
+    { "include": "#builtin-functions" },
+    { "include": "#builtin-types" },
+    { "include": "#literals" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.bac",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.bac",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "decorators": {
+      "patterns": [
+        {
+          "match": "(@)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.decorator.bac" },
+            "2": { "name": "entity.name.decorator.bac" }
+          }
+        }
+      ]
+    },
+    "class-keyword": {
+      "patterns": [
+        {
+          "match": "\\b(class)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.class.bac" },
+            "2": { "name": "entity.name.type.class.bac" }
+          }
+        },
+        {
+          "name": "keyword.other.bac",
+          "match": "\\b(implements|import|from)\\b"
+        },
+        {
+          "comment": "Parent class after `:` in a class header",
+          "match": "(?<=class\\s+[A-Za-z_][A-Za-z0-9_]*\\s*:)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "entity.other.inherited-class.bac" }
+          }
+        }
+      ]
+    },
+    "member-keywords": {
+      "patterns": [
+        {
+          "match": "\\b(function|pure)\\b\\s*(?:(function)\\s+)?([A-Za-z_][A-Za-z0-9_]*)?",
+          "captures": {
+            "1": { "name": "storage.type.function.bac" },
+            "2": { "name": "storage.type.function.bac" },
+            "3": { "name": "entity.name.function.bac" }
+          }
+        },
+        {
+          "match": "\\b(event)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.function.bac" },
+            "2": { "name": "entity.name.function.bac" }
+          }
+        },
+        {
+          "match": "\\b(component)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.bac" },
+            "2": { "name": "variable.other.member.bac" }
+          }
+        },
+        {
+          "match": "\\b(var|let)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.bac" },
+            "2": { "name": "variable.other.bac" }
+          }
+        },
+        {
+          "name": "keyword.other.bac",
+          "match": "\\b(attach|construction)\\b"
+        }
+      ]
+    },
+    "control-keywords": {
+      "name": "keyword.control.bac",
+      "match": "\\b(if|else|for|while|in|break|continue|return|as)\\b"
+    },
+    "async-keyword": {
+      "name": "keyword.control.async.bac",
+      "match": "\\b(await)\\b"
+    },
+    "self-keywords": {
+      "name": "variable.language.bac",
+      "match": "\\b(this|super)\\b"
+    },
+    "builtin-functions": {
+      "name": "support.function.builtin.bac",
+      "match": "\\b(asset|default|new)\\b"
+    },
+    "builtin-types": {
+      "name": "support.type.primitive.bac",
+      "match": "\\b(bool|byte|int|int64|float|name|string|text|Class|SoftClass|SoftObject|Set|Map|Object|Actor|Pawn|Character|SceneComponent|StaticMeshComponent|SphereComponent|PrimitiveComponent|ActorComponent|HitResult)\\b"
+    },
+    "literals": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.true.bac",
+          "match": "\\btrue\\b"
+        },
+        {
+          "name": "constant.language.boolean.false.bac",
+          "match": "\\bfalse\\b"
+        },
+        {
+          "name": "constant.language.null.bac",
+          "match": "\\bnone\\b"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.bac",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.bac",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.bac",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.bac",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.assignment.compound.bac",
+          "match": "(\\+=|-=|\\*=|/=|%=)"
+        },
+        {
+          "name": "keyword.operator.assignment.bac",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.comparison.bac",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.logical.bac",
+          "match": "(&&|\\|\\||!)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.bac",
+          "match": "(\\+|-|\\*|/|%)"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.statement.bac",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.comma.bac",
+          "match": ","
+        },
+        {
+          "name": "punctuation.accessor.bac",
+          "match": "\\."
+        },
+        {
+          "name": "punctuation.section.parens.bac",
+          "match": "[()]"
+        },
+        {
+          "name": "punctuation.section.brackets.bac",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.section.braces.bac",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.separator.colon.bac",
+          "match": ":"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "comment": "Function call (lookahead `(`)",
+          "match": "([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.call.bac" }
+          }
+        },
+        {
+          "comment": "Type after `:` (param type, return type, var type)",
+          "match": "(?<=:)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "entity.name.type.bac" }
+          }
+        },
+        {
+          "comment": "Type after `as` (cast target)",
+          "match": "\\b(as)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.control.bac" },
+            "2": { "name": "entity.name.type.bac" }
+          }
+        },
+        {
+          "name": "variable.other.bac",
+          "match": "[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    }
+  }
+}

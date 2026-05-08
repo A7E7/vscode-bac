@@ -1,0 +1,115 @@
+{
+  "Class declaration": {
+    "prefix": "class",
+    "body": [
+      "class ${1:Name} : ${2:Object} {",
+      "  $0",
+      "}"
+    ],
+    "description": "BAC class declaration"
+  },
+  "Replicated Actor class": {
+    "prefix": "classrep",
+    "body": [
+      "@replicated_default(replicates=true)",
+      "class ${1:Name} : Actor {",
+      "  $0",
+      "}"
+    ],
+    "description": "Replicated AActor-derived class"
+  },
+  "Variable declaration": {
+    "prefix": "var",
+    "body": "var ${1:name}: ${2:int}${3: = ${4:0}}",
+    "description": "Member variable"
+  },
+  "Replicated variable": {
+    "prefix": "varrep",
+    "body": [
+      "@replicated",
+      "var ${1:name}: ${2:int}${3: = ${4:0}}"
+    ],
+    "description": "Variable replicated to clients"
+  },
+  "RepNotify variable": {
+    "prefix": "varrepnotify",
+    "body": [
+      "@replicated(repnotify = OnRep_${1:Name})",
+      "var ${1:Name}: ${2:int}${3: = ${4:0}}"
+    ],
+    "description": "Variable with a RepNotify callback"
+  },
+  "Component declaration": {
+    "prefix": "component",
+    "body": "component ${1:Name}: ${2:SceneComponent}${3: attach ${4:Root}}",
+    "description": "Actor component"
+  },
+  "Component with overrides": {
+    "prefix": "componentdef",
+    "body": [
+      "component ${1:Name}: ${2:StaticMeshComponent}${3: attach ${4:Root}} {",
+      "  ${5:StaticMesh} = ${6:asset(\"/Engine/BasicShapes/Cube.Cube\")}",
+      "}"
+    ],
+    "description": "Component with default-property overrides"
+  },
+  "Function": {
+    "prefix": "fn",
+    "body": [
+      "function ${1:Name}(${2:params}): ${3:void} {",
+      "  $0",
+      "}"
+    ],
+    "description": "Function declaration"
+  },
+  "Pure function": {
+    "prefix": "pure",
+    "body": [
+      "pure function ${1:Name}(${2:params}): ${3:int} {",
+      "  return $0",
+      "}"
+    ],
+    "description": "Pure (no-side-effects) function"
+  },
+  "Event": {
+    "prefix": "event",
+    "body": [
+      "event ${1:Name}(${2:params}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "Custom event or parent override (e.g. BeginPlay)"
+  },
+  "Construction": {
+    "prefix": "construction",
+    "body": [
+      "construction {",
+      "  $0",
+      "}"
+    ],
+    "description": "Construction-script body"
+  },
+  "If-let cast": {
+    "prefix": "iflet",
+    "body": [
+      "if (let ${1:binding} = ${2:expr} as ${3:Class}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "If-let pattern with cast"
+  },
+  "For-each loop": {
+    "prefix": "foreach",
+    "body": [
+      "for (${1:item} in ${2:collection}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "For-each loop"
+  },
+  "Await delay": {
+    "prefix": "await",
+    "body": "await Delay(${1:0.5})$0",
+    "description": "Latent delay (only inside events)"
+  }
+}

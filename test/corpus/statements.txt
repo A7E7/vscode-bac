@@ -1,0 +1,149 @@
+==================
+If/else with comparison
+==================
+
+class X : Object {
+  function Pick(x: int) {
+    if (x == 5) {
+      PrintString("yes")
+    } else {
+      PrintString("no")
+    }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (function_decl
+        name: (identifier)
+        (parameter name: (identifier) type: (type_ref base: (identifier)))
+        body: (block
+          (if_statement
+            condition: (binary_expression
+              left: (identifier)
+              right: (integer_literal))
+            then: (block
+              (expression_statement
+                (call_expression
+                  callee: (identifier)
+                  (call_arg value: (string_literal)))))
+            else: (block
+              (expression_statement
+                (call_expression
+                  callee: (identifier)
+                  (call_arg value: (string_literal)))))))))))
+
+==================
+While + break + compound assign
+==================
+
+class X : Object {
+  function Spin(): int {
+    var n: int = 0
+    while (true) {
+      if (n == 10) { break }
+      n += 1
+    }
+    return n
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (function_decl
+        name: (identifier)
+        return_type: (type_ref base: (identifier))
+        body: (block
+          (var_decl_statement
+            name: (identifier)
+            type: (type_ref base: (identifier))
+            initializer: (integer_literal))
+          (while_statement
+            condition: (bool_literal)
+            body: (block
+              (if_statement
+                condition: (binary_expression
+                  left: (identifier)
+                  right: (integer_literal))
+                then: (block
+                  (break_statement)))
+              (assignment_statement
+                target: (identifier)
+                value: (integer_literal))))
+          (return_statement value: (identifier)))))))
+
+==================
+For-each with member-access target
+==================
+
+class X : Object {
+  function Each(items: int[]) {
+    for (item in items) {
+      PrintString("v")
+    }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (function_decl
+        name: (identifier)
+        (parameter name: (identifier) type: (type_ref base: (identifier)))
+        body: (block
+          (for_statement
+            binding: (identifier)
+            iterable: (identifier)
+            body: (block
+              (expression_statement
+                (call_expression
+                  callee: (identifier)
+                  (call_arg value: (string_literal)))))))))))
+
+==================
+If-let cast
+==================
+
+class X : Object {
+  function Trace(o: Object) {
+    if (let actor = o as Actor) {
+      PrintString("hit")
+    }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (function_decl
+        name: (identifier)
+        (parameter name: (identifier) type: (type_ref base: (identifier)))
+        body: (block
+          (if_statement
+            (if_let_binding binding: (identifier))
+            condition: (cast_expression
+              source: (identifier)
+              target_type: (type_ref base: (identifier)))
+            then: (block
+              (expression_statement
+                (call_expression
+                  callee: (identifier)
+                  (call_arg value: (string_literal)))))))))))
