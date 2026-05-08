@@ -12,6 +12,17 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — wire-stable exec command `bac.sync.resolve` (gap 5)
+- New plugin-side exec command opens a side-by-side `.bac` vs canonical
+  diff dialog in the UE editor for the named asset. The LSP can wire
+  this to a "Resolve" code action on `BAC2410` diagnostics — `code
+  action title: "Open conflict resolver"`, command:
+  `UnrealEditor-Cmd <project> -ExecCmds="bac.sync.resolve <AssetPath>, Quit"`.
+- Cross-repo follow-up: surface the action in `lsp/src/navigation/code-actions.ts`
+  next time we touch it. Today the user can already run the command
+  from the editor console; the LSP plumbing is convenience, not a
+  blocker.
+
 ### Added — wire-stable diagnostic code `BAC3100` (partial regeneration applied)
 - Reserved on the plugin side (gap 4 foundation). Surfaced by the
   watcher's `bac.sync.events` push channel when the generator returns a
