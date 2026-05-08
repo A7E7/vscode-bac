@@ -2,7 +2,7 @@
   "name": "vscode-bac",
   "displayName": "Blueprint as Code (BAC)",
   "description": "Syntax highlighting, snippets, and diagnostics for .bac scripts that round-trip with Unreal Engine Blueprints.",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "publisher": "andreas-eichert",
   "engines": {
     "vscode": "^1.85.0"

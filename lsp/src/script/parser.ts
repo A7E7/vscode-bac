@@ -1,0 +1,810 @@
+// 1:1 port of BacParser.cpp.
+//
+// Recursive-descent parser. Mirrors the structure of the C++ parser one-to-one
+// — every parse function here corresponds to a parse function in BacParser.cpp,
+// and diagnostic codes (BAC10xx) are wire-stable.
+
+import { BacDiagnostics, BacSourceLocation, NO_LOCATION } from './diagnostics';
+import { BacToken, BacTokenKind, tokenKindName } from './token';
+import * as ast from './ast';
+
+export function parse(tokens: BacToken[], diagnostics: BacDiagnostics): ast.BacScriptAst {
+  return new Parser(tokens, diagnostics).parse();
+}
+
+// ─── Op tables ──────────────────────────────────────────────────────────────
+function tokenToAssignOp(k: BacTokenKind): ast.BacAssignOp | undefined {
+  switch (k) {
+    case BacTokenKind.Assign:    return 'assign';
+    case BacTokenKind.PlusEq:    return 'plus_eq';
+    case BacTokenKind.MinusEq:   return 'minus_eq';
+    case BacTokenKind.StarEq:    return 'star_eq';
+    case BacTokenKind.SlashEq:   return 'slash_eq';
+    case BacTokenKind.PercentEq: return 'percent_eq';
+  }
+  return undefined;
+}
+function tokenToCmpOp(k: BacTokenKind): ast.BacBinaryOp | undefined {
+  switch (k) {
+    case BacTokenKind.EqEq:  return 'eq';
+    case BacTokenKind.NotEq: return 'not_eq';
+    case BacTokenKind.Lt:    return 'lt';
+    case BacTokenKind.Gt:    return 'gt';
+    case BacTokenKind.LtEq:  return 'lt_eq';
+    case BacTokenKind.GtEq:  return 'gt_eq';
+  }
+  return undefined;
+}
+
+class Parser {
+  private pos = 0;
+
+  constructor(private readonly tokens: BacToken[], private readonly diags: BacDiagnostics) {}
+
+  // ─── Cursor helpers ──────────────────────────────────────────────────────
+  private at(offset = 0): BacToken {
+    const i = Math.min(this.pos + offset, this.tokens.length - 1);
+    return this.tokens[Math.max(i, 0)];
+  }
+  private current(): BacToken { return this.at(0); }
+  private check(k: BacTokenKind): boolean { return this.current().kind === k; }
+  private isAtEnd(): boolean { return this.current().kind === BacTokenKind.Eof; }
+  private advance(): void { if (!this.isAtEnd()) { this.pos++; } }
+  private match(k: BacTokenKind): boolean {
+    if (this.check(k)) { this.advance(); return true; }
+    return false;
+  }
+  private skipNewlines(): void { while (this.check(BacTokenKind.Newline)) { this.advance(); } }
+
+  private expect(k: BacTokenKind, what: string): boolean {
+    if (this.match(k)) { return true; }
+    const cur = this.current();
+    const got = cur.lexeme || tokenKindName(cur.kind);
+    this.error(`Expected ${what} but got '${got}'.`, cur.location, 'BAC1001');
+    return false;
+  }
+  private expectIdentifier(what: string): string {
+    if (!this.check(BacTokenKind.Identifier)) {
+      const cur = this.current();
+      this.error(`Expected ${what} (identifier) but got '${tokenKindName(cur.kind)}'.`,
+        cur.location, 'BAC1002');
+      return '';
+    }
+    const name = this.current().lexeme;
+    this.advance();
+    return name;
+  }
+  private error(message: string, location: BacSourceLocation, code: string): void {
+    this.diags.error(message, location, code);
+  }
+
+  // ─── Backtracking ────────────────────────────────────────────────────────
+  private save(): { pos: number; diagCount: number } {
+    return { pos: this.pos, diagCount: this.diags.items.length };
+  }
+  private restore(s: { pos: number; diagCount: number }): void {
+    this.pos = s.pos;
+    this.diags.items.length = s.diagCount;
+  }
+
+  // ─── Recovery ────────────────────────────────────────────────────────────
+  private syncToMemberOrEnd(): void {
+    while (!this.isAtEnd()) {
+      switch (this.current().kind) {
+        case BacTokenKind.RBrace:
+        case BacTokenKind.At:
+        case BacTokenKind.Kw_Var:
+        case BacTokenKind.Kw_Component:
+        case BacTokenKind.Kw_Function:
+        case BacTokenKind.Kw_Pure:
+        case BacTokenKind.Kw_Event:
+        case BacTokenKind.Kw_Construction:
+          return;
+        default: this.advance();
+      }
+    }
+  }
+
+  // ─── Top-level ───────────────────────────────────────────────────────────
+  parse(): ast.BacScriptAst {
+    const out: ast.BacScriptAst = { imports: [] };
+    this.skipNewlines();
+
+    while (this.check(BacTokenKind.Kw_Import)) {
+      const imp = this.tryParseImport();
+      if (imp) { out.imports.push(imp); }
+      this.skipNewlines();
+    }
+
+    const classDecorators = this.parseDecorators();
+    this.skipNewlines();
+
+    if (!this.check(BacTokenKind.Kw_Class)) {
+      this.error("Expected 'class' declaration after imports/decorators.",
+        this.current().location, 'BAC1010');
+      return out;
+    }
+
+    out.class = this.parseClassDecl(classDecorators);
+    this.skipNewlines();
+
+    if (!this.isAtEnd()) {
+      this.error('Unexpected tokens after end of class. Only one class declaration per .bac file is supported.',
+        this.current().location, 'BAC1011');
+    }
+    return out;
+  }
+
+  // ─── Imports ─────────────────────────────────────────────────────────────
+  private tryParseImport(): ast.BacImport | undefined {
+    const location = this.current().location;
+    this.advance(); // 'import'
+    if (!this.expect(BacTokenKind.LBrace, "'{' to begin imported names")) { return undefined; }
+    const names: string[] = [];
+    while (true) {
+      const name = this.expectIdentifier('imported identifier');
+      if (!name) { return undefined; }
+      names.push(name);
+      if (this.match(BacTokenKind.Comma)) { continue; }
+      break;
+    }
+    if (!this.expect(BacTokenKind.RBrace, "'}' to close imports")) { return undefined; }
+    if (!this.expect(BacTokenKind.Kw_From, "'from' after import names")) { return undefined; }
+    if (!this.check(BacTokenKind.StringLit)) {
+      this.error("Expected string literal path after 'from'.", this.current().location, 'BAC1003');
+      return undefined;
+    }
+    let path = this.current().lexeme;
+    if (path.length >= 2 && path[0] === '"' && path[path.length - 1] === '"') {
+      path = path.slice(1, -1);
+    }
+    this.advance();
+    return { location, names, fromPath: path };
+  }
+
+  // ─── Decorators ──────────────────────────────────────────────────────────
+  private parseDecorators(): ast.BacDecorator[] {
+    const out: ast.BacDecorator[] = [];
+    while (true) {
+      this.skipNewlines();
+      if (!this.check(BacTokenKind.At)) { break; }
+      const d = this.parseDecorator();
+      if (!d) { break; }
+      out.push(d);
+    }
+    return out;
+  }
+
+  private isKeywordTokenKind(k: BacTokenKind): boolean {
+    return k >= BacTokenKind.Kw_Class && k <= BacTokenKind.Kw_New;
+  }
+  private tryConsumeNameAllowingKeywords(): string | undefined {
+    const k = this.current().kind;
+    if (k !== BacTokenKind.Identifier && !this.isKeywordTokenKind(k)) { return undefined; }
+    const name = this.current().lexeme;
+    this.advance();
+    return name;
+  }
+
+  private parseDecorator(): ast.BacDecorator | undefined {
+    const location = this.current().location;
+    if (!this.match(BacTokenKind.At)) { return undefined; }
+    const name = this.tryConsumeNameAllowingKeywords();
+    if (name === undefined) {
+      this.error(`Expected decorator name after '@' but got '${tokenKindName(this.current().kind)}'.`,
+        this.current().location, 'BAC1002');
+      return undefined;
+    }
+    const args: ast.BacDecoratorArg[] = [];
+    if (this.match(BacTokenKind.LParen)) {
+      if (!this.check(BacTokenKind.RParen)) {
+        while (true) {
+          let argName: string | undefined;
+          if (this.check(BacTokenKind.Identifier) && this.at(1).kind === BacTokenKind.Assign) {
+            argName = this.current().lexeme;
+            this.advance(); // ident
+            this.advance(); // =
+          }
+          const value = this.parseExpr();
+          if (!value) { break; }
+          args.push(argName ? { name: argName, value } : { value });
+          if (this.match(BacTokenKind.Comma)) { continue; }
+          break;
+        }
+      }
+      this.expect(BacTokenKind.RParen, "')' to close decorator arguments");
+    }
+    return { location, name, args };
+  }
+
+  // ─── Class ───────────────────────────────────────────────────────────────
+  private parseClassDecl(decorators: ast.BacDecorator[]): ast.BacClassDecl {
+    const out: ast.BacClassDecl = {
+      location: this.current().location,
+      name: '', parentTypeName: '',
+      implementedInterfaces: [], decorators, members: [],
+    };
+    this.advance(); // 'class'
+    out.name = this.expectIdentifier('class name');
+    if (this.match(BacTokenKind.Colon)) {
+      out.parentTypeName = this.expectIdentifier('parent class name');
+    }
+    this.skipNewlines();
+    if (this.match(BacTokenKind.Kw_Implements)) {
+      while (true) {
+        this.skipNewlines();
+        const iface = this.expectIdentifier('interface name');
+        if (!iface) { break; }
+        out.implementedInterfaces.push(iface);
+        if (!this.match(BacTokenKind.Comma)) { break; }
+      }
+    }
+    this.skipNewlines();
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open class body")) { return out; }
+
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+      const m = this.parseMember();
+      if (m) { out.members.push(m); }
+      else   { this.syncToMemberOrEnd(); }
+    }
+    this.expect(BacTokenKind.RBrace, "'}' to close class body");
+    return out;
+  }
+
+  // ─── Members ─────────────────────────────────────────────────────────────
+  private parseMember(): ast.BacMember | undefined {
+    const decorators = this.parseDecorators();
+    this.skipNewlines();
+
+    switch (this.current().kind) {
+      case BacTokenKind.Kw_Var:          return this.parseVariableDecl(decorators);
+      case BacTokenKind.Kw_Component:    return this.parseComponentDecl(decorators);
+      case BacTokenKind.Kw_Function:     return this.parseFunctionDecl(decorators, false);
+      case BacTokenKind.Kw_Pure: {
+        this.advance();
+        if (!this.check(BacTokenKind.Kw_Function)) {
+          this.error("Expected 'function' after 'pure'.", this.current().location, 'BAC1020');
+          return undefined;
+        }
+        return this.parseFunctionDecl(decorators, true);
+      }
+      case BacTokenKind.Kw_Event:        return this.parseEventDecl(decorators);
+      case BacTokenKind.Kw_Construction: return this.parseConstructionDecl(decorators);
+      default: {
+        this.error(
+          `Expected class member (var, component, function, event, construction) but got '${tokenKindName(this.current().kind)}'.`,
+          this.current().location, 'BAC1021');
+        return undefined;
+      }
+    }
+  }
+
+  private parseVariableDecl(decorators: ast.BacDecorator[]): ast.BacVariableDecl {
+    const out: ast.BacVariableDecl = {
+      kind: 'variable', location: this.current().location, decorators,
+      name: '', type: { location: NO_LOCATION, baseName: '', genericArgs: [], arrayDepth: 0 },
+    };
+    this.advance(); // 'var'
+    out.name = this.expectIdentifier('variable name');
+    if (!this.expect(BacTokenKind.Colon, "':' before variable type")) { return out; }
+    out.type = this.parseTypeRef();
+    if (this.match(BacTokenKind.Assign)) {
+      const init = this.parseExpr();
+      if (init) { out.initializer = init; }
+    }
+    return out;
+  }
+
+  private parseComponentDecl(decorators: ast.BacDecorator[]): ast.BacComponentDecl {
+    const out: ast.BacComponentDecl = {
+      kind: 'component', location: this.current().location, decorators,
+      name: '', type: { location: NO_LOCATION, baseName: '', genericArgs: [], arrayDepth: 0 },
+      attachParent: '', defaults: [],
+    };
+    this.advance(); // 'component'
+    out.name = this.expectIdentifier('component name');
+    if (!this.expect(BacTokenKind.Colon, "':' before component type")) { return out; }
+    out.type = this.parseTypeRef();
+    if (this.match(BacTokenKind.Kw_Attach)) {
+      out.attachParent = this.expectIdentifier('attach-parent component name');
+    }
+    if (this.match(BacTokenKind.LBrace)) {
+      while (true) {
+        this.skipNewlines();
+        if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+        const location = this.current().location;
+        const name = this.expectIdentifier('property name');
+        if (!name) { break; }
+        if (!this.expect(BacTokenKind.Assign, "'=' between property name and value")) { break; }
+        const value = this.parseExpr();
+        if (!value) { break; }
+        out.defaults.push({ name, value, location });
+        this.skipNewlines();
+        // optional comma
+        this.match(BacTokenKind.Comma);
+      }
+      this.expect(BacTokenKind.RBrace, "'}' to close component body");
+    }
+    return out;
+  }
+
+  private parseFunctionDecl(decorators: ast.BacDecorator[], isPure: boolean): ast.BacFunctionDecl {
+    const out: ast.BacFunctionDecl = {
+      kind: 'function', location: this.current().location, decorators,
+      name: '', params: [], body: { kind: 'block', location: NO_LOCATION, statements: [] },
+      isPure, interfaceImpl: '',
+    };
+    this.advance(); // 'function'
+    out.name = this.expectIdentifier('function name');
+    if (!this.expect(BacTokenKind.LParen, "'(' to begin parameter list")) { return out; }
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RParen)) { break; }
+      const p = this.parseParam();
+      if (!p) { break; }
+      out.params.push(p);
+      this.skipNewlines();
+      if (!this.match(BacTokenKind.Comma)) { break; }
+    }
+    this.skipNewlines();
+    this.expect(BacTokenKind.RParen, "')' to close parameter list");
+    if (this.match(BacTokenKind.Colon)) { out.returnType = this.parseTypeRef(); }
+    if (this.match(BacTokenKind.Kw_Implements)) {
+      const iface = this.expectIdentifier("interface name (before '.method')");
+      this.expect(BacTokenKind.Dot, "'.' between interface and method");
+      const method = this.expectIdentifier('interface method name');
+      out.interfaceImpl = `${iface}.${method}`;
+    }
+    this.skipNewlines();
+    out.body = this.parseBlock();
+    return out;
+  }
+
+  private parseEventDecl(decorators: ast.BacDecorator[]): ast.BacEventDecl {
+    const out: ast.BacEventDecl = {
+      kind: 'event', location: this.current().location, decorators,
+      name: '', params: [], body: { kind: 'block', location: NO_LOCATION, statements: [] },
+    };
+    this.advance(); // 'event'
+    out.name = this.expectIdentifier('event name');
+    if (!this.expect(BacTokenKind.LParen, "'(' to begin parameter list")) { return out; }
+    if (!this.check(BacTokenKind.RParen)) {
+      while (true) {
+        this.skipNewlines();
+        const p = this.parseParam();
+        if (!p) { break; }
+        out.params.push(p);
+        this.skipNewlines();
+        if (this.match(BacTokenKind.Comma)) { continue; }
+        break;
+      }
+    }
+    this.skipNewlines();
+    this.expect(BacTokenKind.RParen, "')' to close parameter list");
+    this.skipNewlines();
+    out.body = this.parseBlock();
+    return out;
+  }
+
+  private parseConstructionDecl(decorators: ast.BacDecorator[]): ast.BacConstructionDecl {
+    const location = this.current().location;
+    this.advance(); // 'construction'
+    const body = this.parseBlock();
+    return { kind: 'construction', location, decorators, body };
+  }
+
+  private parseParam(): ast.BacParam | undefined {
+    const decorators = this.parseDecorators();
+    const name = this.expectIdentifier('parameter name');
+    if (!name) { return undefined; }
+    if (!this.expect(BacTokenKind.Colon, "':' before parameter type")) { return undefined; }
+    const type = this.parseTypeRef();
+    let defaultExpr: ast.BacExpr | undefined;
+    if (this.match(BacTokenKind.Assign)) {
+      const e = this.parseExpr();
+      if (e) { defaultExpr = e; }
+    }
+    return { name, type, decorators, default: defaultExpr };
+  }
+
+  // ─── Types ───────────────────────────────────────────────────────────────
+  private parseTypeRef(): ast.BacTypeRef {
+    const out: ast.BacTypeRef = {
+      location: this.current().location, baseName: '', genericArgs: [], arrayDepth: 0,
+    };
+    out.baseName = this.expectIdentifier('type name');
+    if (this.match(BacTokenKind.Lt)) {
+      while (true) {
+        this.skipNewlines();
+        const arg = this.parseTypeRef();
+        if (!arg.baseName) { break; }
+        out.genericArgs.push(arg);
+        if (this.match(BacTokenKind.Comma)) { continue; }
+        break;
+      }
+      this.expect(BacTokenKind.Gt, "'>' to close generic arguments");
+    }
+    while (this.match(BacTokenKind.LBracket)) {
+      this.expect(BacTokenKind.RBracket, "']' to close array marker");
+      out.arrayDepth++;
+    }
+    return out;
+  }
+
+  // ─── Statements ──────────────────────────────────────────────────────────
+  private parseBlock(): ast.BacBlockStmt {
+    const out: ast.BacBlockStmt = {
+      kind: 'block', location: this.current().location, statements: [],
+    };
+    if (!this.expect(BacTokenKind.LBrace, "'{' to begin block")) { return out; }
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+      const s = this.parseStmt();
+      if (s) { out.statements.push(s); }
+      this.skipNewlines();
+    }
+    this.expect(BacTokenKind.RBrace, "'}' to close block");
+    return out;
+  }
+
+  private parseStmt(): ast.BacStmt | undefined {
+    switch (this.current().kind) {
+      case BacTokenKind.LBrace:    return this.parseBlock();
+      case BacTokenKind.Kw_If:     return this.parseIf();
+      case BacTokenKind.Kw_For:    return this.parseFor();
+      case BacTokenKind.Kw_While:  return this.parseWhile();
+      case BacTokenKind.Kw_Return: return this.parseReturn();
+      case BacTokenKind.Kw_Break: {
+        const location = this.current().location;
+        this.advance();
+        return { kind: 'break', location };
+      }
+      case BacTokenKind.Kw_Continue: {
+        const location = this.current().location;
+        this.advance();
+        return { kind: 'continue', location };
+      }
+      case BacTokenKind.Kw_Var: return this.parseVarDeclStmt(true);
+      case BacTokenKind.Kw_Let: return this.parseVarDeclStmt(false);
+      default: return this.parseAssignOrExprStmt();
+    }
+  }
+
+  private parseIf(): ast.BacIfStmt {
+    const out: ast.BacIfStmt = {
+      kind: 'if', location: this.current().location,
+      condition: { kind: 'none_lit', location: NO_LOCATION },
+      then: { kind: 'block', location: NO_LOCATION, statements: [] },
+    };
+    this.advance(); // 'if'
+    if (!this.expect(BacTokenKind.LParen, "'(' after 'if'")) { return out; }
+    if (this.check(BacTokenKind.Kw_Let)) {
+      this.advance();
+      out.letName = this.expectIdentifier('binding name in if-let');
+      this.expect(BacTokenKind.Assign, "'=' in if-let");
+    }
+    const cond = this.parseExpr();
+    if (cond) { out.condition = cond; }
+    this.expect(BacTokenKind.RParen, "')' to close 'if' condition");
+    this.skipNewlines();
+    out.then = this.parseBlock();
+    this.skipNewlines();
+    if (this.match(BacTokenKind.Kw_Else)) {
+      this.skipNewlines();
+      out.else = this.check(BacTokenKind.Kw_If) ? this.parseIf() : this.parseBlock();
+    }
+    return out;
+  }
+
+  private parseFor(): ast.BacForStmt {
+    const out: ast.BacForStmt = {
+      kind: 'for', location: this.current().location,
+      bindingName: '',
+      iterable: { kind: 'none_lit', location: NO_LOCATION },
+      body: { kind: 'block', location: NO_LOCATION, statements: [] },
+    };
+    this.advance(); // 'for'
+    if (!this.expect(BacTokenKind.LParen, "'(' after 'for'")) { return out; }
+    out.bindingName = this.expectIdentifier("binding name in 'for'");
+    if (this.match(BacTokenKind.Colon)) { out.bindingType = this.parseTypeRef(); }
+    if (!this.expect(BacTokenKind.Kw_In, "'in' between binding and iterable")) { return out; }
+    const iter = this.parseExpr();
+    if (iter) { out.iterable = iter; }
+    this.expect(BacTokenKind.RParen, "')' to close 'for' header");
+    this.skipNewlines();
+    out.body = this.parseBlock();
+    return out;
+  }
+
+  private parseWhile(): ast.BacWhileStmt {
+    const out: ast.BacWhileStmt = {
+      kind: 'while', location: this.current().location,
+      condition: { kind: 'none_lit', location: NO_LOCATION },
+      body: { kind: 'block', location: NO_LOCATION, statements: [] },
+    };
+    this.advance(); // 'while'
+    if (!this.expect(BacTokenKind.LParen, "'(' after 'while'")) { return out; }
+    const cond = this.parseExpr();
+    if (cond) { out.condition = cond; }
+    this.expect(BacTokenKind.RParen, "')' to close 'while' condition");
+    this.skipNewlines();
+    out.body = this.parseBlock();
+    return out;
+  }
+
+  private parseReturn(): ast.BacReturnStmt {
+    const out: ast.BacReturnStmt = { kind: 'return', location: this.current().location };
+    this.advance(); // 'return'
+    if (!this.check(BacTokenKind.Newline) && !this.check(BacTokenKind.Semicolon) && !this.check(BacTokenKind.RBrace)) {
+      const v = this.parseExpr();
+      if (v) { out.value = v; }
+    }
+    return out;
+  }
+
+  private parseVarDeclStmt(isMutable: boolean): ast.BacVarDeclStmt {
+    const out: ast.BacVarDeclStmt = {
+      kind: 'var_decl', location: this.current().location,
+      isMutable, name: '',
+    };
+    this.advance(); // 'var' or 'let'
+    out.name = this.expectIdentifier('local variable name');
+    if (this.match(BacTokenKind.Colon)) { out.type = this.parseTypeRef(); }
+    if (this.match(BacTokenKind.Assign)) {
+      const e = this.parseExpr();
+      if (e) { out.initializer = e; }
+    }
+    return out;
+  }
+
+  private parseAssignOrExprStmt(): ast.BacStmt | undefined {
+    const location = this.current().location;
+    const lhs = this.parseExpr();
+    if (!lhs) { return undefined; }
+    const op = tokenToAssignOp(this.current().kind);
+    if (op) {
+      this.advance();
+      const value = this.parseExpr();
+      if (!value) { return undefined; }
+      return { kind: 'assign', location, op, target: lhs, value };
+    }
+    return { kind: 'expr', location, expr: lhs };
+  }
+
+  // ─── Expressions ─────────────────────────────────────────────────────────
+  private parseExpr(): ast.BacExpr | undefined { return this.parseOr(); }
+
+  private parseOr(): ast.BacExpr | undefined {
+    let lhs = this.parseAnd();
+    while (lhs && this.match(BacTokenKind.PipePipe)) {
+      const right = this.parseAnd();
+      if (!right) { return lhs; }
+      lhs = { kind: 'binary', location: lhs.location, op: 'or', left: lhs, right };
+    }
+    return lhs;
+  }
+  private parseAnd(): ast.BacExpr | undefined {
+    let lhs = this.parseCmp();
+    while (lhs && this.match(BacTokenKind.AmpAmp)) {
+      const right = this.parseCmp();
+      if (!right) { return lhs; }
+      lhs = { kind: 'binary', location: lhs.location, op: 'and', left: lhs, right };
+    }
+    return lhs;
+  }
+  private parseCmp(): ast.BacExpr | undefined {
+    let lhs = this.parseAdd();
+    while (lhs) {
+      const op = tokenToCmpOp(this.current().kind);
+      if (!op) { break; }
+      this.advance();
+      const right = this.parseAdd();
+      if (!right) { return lhs; }
+      lhs = { kind: 'binary', location: lhs.location, op, left: lhs, right };
+    }
+    return lhs;
+  }
+  private parseAdd(): ast.BacExpr | undefined {
+    let lhs = this.parseMul();
+    while (lhs && (this.check(BacTokenKind.Plus) || this.check(BacTokenKind.Minus))) {
+      const op: ast.BacBinaryOp = this.check(BacTokenKind.Plus) ? 'add' : 'sub';
+      this.advance();
+      const right = this.parseMul();
+      if (!right) { return lhs; }
+      lhs = { kind: 'binary', location: lhs.location, op, left: lhs, right };
+    }
+    return lhs;
+  }
+  private parseMul(): ast.BacExpr | undefined {
+    let lhs = this.parseUnary();
+    while (lhs && (this.check(BacTokenKind.Star) || this.check(BacTokenKind.Slash) || this.check(BacTokenKind.Percent))) {
+      const op: ast.BacBinaryOp =
+        this.check(BacTokenKind.Star)  ? 'mul' :
+        this.check(BacTokenKind.Slash) ? 'div' :
+                                          'mod';
+      this.advance();
+      const right = this.parseUnary();
+      if (!right) { return lhs; }
+      lhs = { kind: 'binary', location: lhs.location, op, left: lhs, right };
+    }
+    return lhs;
+  }
+
+  private parseUnary(): ast.BacExpr | undefined {
+    if (this.match(BacTokenKind.Bang)) {
+      const location = this.at(-1).location;
+      const operand = this.parseUnary();
+      if (!operand) { return undefined; }
+      return { kind: 'unary', location, op: 'not', operand };
+    }
+    if (this.match(BacTokenKind.Minus)) {
+      const location = this.at(-1).location;
+      const operand = this.parseUnary();
+      if (!operand) { return undefined; }
+      return { kind: 'unary', location, op: 'negate', operand };
+    }
+    if (this.match(BacTokenKind.Kw_Await)) {
+      const location = this.at(-1).location;
+      const inner = this.parseUnary();
+      if (!inner) { return undefined; }
+      return { kind: 'await', location, inner };
+    }
+    return this.parsePostfix();
+  }
+
+  private parseCallArgs(out: ast.BacCallArg[]): boolean {
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RParen)) { break; }
+      let name: string | undefined;
+      if (this.check(BacTokenKind.Identifier) && this.at(1).kind === BacTokenKind.Assign) {
+        name = this.current().lexeme;
+        this.advance(); this.advance();
+      }
+      const value = this.parseExpr();
+      if (!value) { break; }
+      out.push(name ? { name, value } : { value });
+      this.skipNewlines();
+      if (!this.match(BacTokenKind.Comma)) { break; }
+    }
+    return true;
+  }
+
+  private tryParseGenericCallArgs(): { typeArgs: ast.BacTypeRef[]; args: ast.BacCallArg[] } | undefined {
+    const snapshot = this.save();
+    if (!this.match(BacTokenKind.Lt)) { return undefined; }
+    const typeArgs: ast.BacTypeRef[] = [];
+    while (true) {
+      if (!this.check(BacTokenKind.Identifier)) { this.restore(snapshot); return undefined; }
+      const t = this.parseTypeRef();
+      if (!t.baseName) { this.restore(snapshot); return undefined; }
+      typeArgs.push(t);
+      if (this.match(BacTokenKind.Comma)) { continue; }
+      break;
+    }
+    if (!this.match(BacTokenKind.Gt))     { this.restore(snapshot); return undefined; }
+    if (!this.check(BacTokenKind.LParen)) { this.restore(snapshot); return undefined; }
+    this.advance(); // (
+    const args: ast.BacCallArg[] = [];
+    this.parseCallArgs(args);
+    if (!this.match(BacTokenKind.RParen)) { this.restore(snapshot); return undefined; }
+    return { typeArgs, args };
+  }
+
+  private parsePostfix(): ast.BacExpr | undefined {
+    let result = this.parsePrimary();
+    while (result) {
+      const location = result.location;
+      if (this.match(BacTokenKind.Dot)) {
+        const memberName = this.expectIdentifier('member name');
+        result = { kind: 'member_access', location, target: result, memberName };
+      } else if (this.match(BacTokenKind.LBracket)) {
+        const index = this.parseExpr();
+        if (!index) { return result; }
+        this.expect(BacTokenKind.RBracket, "']' to close index");
+        result = { kind: 'index', location, target: result, index };
+      } else if (this.match(BacTokenKind.LParen)) {
+        const args: ast.BacCallArg[] = [];
+        this.parseCallArgs(args);
+        this.skipNewlines();
+        this.expect(BacTokenKind.RParen, "')' to close argument list");
+        result = { kind: 'call', location, callee: result, args };
+      } else if (this.check(BacTokenKind.Lt)) {
+        const generic = this.tryParseGenericCallArgs();
+        if (generic) {
+          result = { kind: 'generic_call', location, callee: result,
+                     typeArgs: generic.typeArgs, args: generic.args };
+        } else {
+          break;
+        }
+      } else if (this.match(BacTokenKind.Kw_As)) {
+        const targetType = this.parseTypeRef();
+        result = { kind: 'cast', location, source: result, targetType };
+      } else {
+        break;
+      }
+    }
+    return result;
+  }
+
+  private parsePrimary(): ast.BacExpr | undefined {
+    const location = this.current().location;
+    const tok = this.current();
+    switch (tok.kind) {
+      case BacTokenKind.IntLit: {
+        this.advance();
+        // Decimal int. Hex/binary use the same lexeme but with a prefix.
+        let raw = tok.lexeme;
+        let value: bigint;
+        try {
+          if (raw.startsWith('0x') || raw.startsWith('0X')) { value = BigInt(raw); }
+          else if (raw.startsWith('0b') || raw.startsWith('0B')) { value = BigInt('0b' + raw.slice(2)); }
+          else { value = BigInt(raw); }
+        } catch { value = 0n; }
+        return { kind: 'int_lit', location, value };
+      }
+      case BacTokenKind.FloatLit: {
+        this.advance();
+        return { kind: 'float_lit', location, value: Number(tok.lexeme) };
+      }
+      case BacTokenKind.StringLit: {
+        this.advance();
+        let raw = tok.lexeme;
+        if (raw.length >= 2 && raw[0] === '"' && raw[raw.length - 1] === '"') {
+          raw = raw.slice(1, -1);
+        }
+        return { kind: 'string_lit', location, value: raw };
+      }
+      case BacTokenKind.Kw_True:  this.advance(); return { kind: 'bool_lit', location, value: true };
+      case BacTokenKind.Kw_False: this.advance(); return { kind: 'bool_lit', location, value: false };
+      case BacTokenKind.Kw_None:  this.advance(); return { kind: 'none_lit', location };
+      case BacTokenKind.Kw_This:  this.advance(); return { kind: 'this',     location };
+      case BacTokenKind.Kw_Super: this.advance(); return { kind: 'super',    location };
+      case BacTokenKind.Identifier: {
+        this.advance();
+        return { kind: 'ident', location, name: tok.lexeme };
+      }
+      case BacTokenKind.LParen: {
+        this.advance();
+        const inner = this.parseExpr();
+        this.expect(BacTokenKind.RParen, "')' to close parenthesized expression");
+        return inner;
+      }
+      case BacTokenKind.Kw_Asset: {
+        this.advance();
+        this.expect(BacTokenKind.LParen, "'(' after 'asset'");
+        let path = '';
+        if (this.check(BacTokenKind.StringLit)) {
+          let raw = this.current().lexeme;
+          if (raw.length >= 2 && raw[0] === '"' && raw[raw.length - 1] === '"') {
+            raw = raw.slice(1, -1);
+          }
+          path = raw;
+          this.advance();
+        } else {
+          this.error("'asset(...)' expects a string literal path.", this.current().location, 'BAC1030');
+        }
+        this.expect(BacTokenKind.RParen, "')' to close 'asset(...)'");
+        return { kind: 'asset', location, path };
+      }
+      case BacTokenKind.Kw_Default: {
+        this.advance();
+        this.expect(BacTokenKind.Lt, "'<' after 'default'");
+        const typeArg = this.parseTypeRef();
+        this.expect(BacTokenKind.Gt, "'>' to close 'default<...>'");
+        this.expect(BacTokenKind.LParen, "'(' after 'default<T>'");
+        this.expect(BacTokenKind.RParen, "')' to close 'default<T>()'");
+        return { kind: 'default', location, typeArg };
+      }
+      default: {
+        this.error(`Expected expression, got '${tokenKindName(tok.kind)}'.`,
+          tok.location, 'BAC1040');
+        this.advance();
+        return undefined;
+      }
+    }
+  }
+}

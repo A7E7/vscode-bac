@@ -25,6 +25,12 @@ import * as fsp from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
+import { tokenize } from './script/lexer';
+import { parse } from './script/parser';
+import { BacDiagnostics, BacDiagnostic } from './script/diagnostics';
+import { runContractCheck } from './validate/contract-check';
+import { runReferenceCheck } from './validate/reference-check';
+import { runTypeCheck } from './validate/type-check';
 
 interface BacSettings {
   unrealEditorPath: string;
@@ -40,7 +46,11 @@ const DEFAULTS: BacSettings = {
   lintTimeoutMs:    60_000,
 };
 
-interface BacDiagnostic {
+// JSON wire shape produced by the `bac.lint` UE exec command. Field names
+// are flat strings (line/column) — different from the TS-internal
+// BacDiagnostic which uses a nested BacSourceLocation. Renamed `_LintWire`
+// so the import from script/diagnostics doesn't collide.
+interface BacDiagnostic_LintWire {
   severity: 'error' | 'warning' | 'info';
   code:    string;
   message: string;
@@ -54,7 +64,7 @@ interface BacDiagnostic {
 
 interface BacLintResult {
   ok:           boolean;
-  diagnostics:  BacDiagnostic[];
+  diagnostics:  BacDiagnostic_LintWire[];
 }
 
 let settings: BacSettings = { ...DEFAULTS };
@@ -89,12 +99,36 @@ async function runOnce(filePath: string): Promise<void> {
 }
 
 // ─── LSP mode ───────────────────────────────────────────────────────────────
+//
+// Two diagnostic streams per document, merged into one publishDiagnostics
+// payload:
+//
+//   1. AST-only TS passes (lex + parse + contract/reference/type checks) —
+//      run on every open / change. Sub-millisecond. No UE dependency.
+//   2. Engine-coupled `bac.lint` UE roundtrip — runs on save only. Slow
+//      (~5s editor startup) but the only path that can validate
+//      identifier resolution against parent UClass + UFUNCTION reflection.
+//
+// Diagnostics from (1) are debounced (50ms) so rapid keystrokes don't ship
+// stale output. Diagnostics from (2) are coalesced — one in-flight lint per
+// document, additional saves drop until the current run finishes.
+
+interface DocState {
+  astDiagnostics:    Diagnostic[];      // from TS passes (didChange)
+  engineDiagnostics: Diagnostic[];      // from bac.lint   (didSave)
+  astDebounce?:      NodeJS.Timeout;
+  engineInflight?:   Promise<void>;
+}
+
 function startLspServer(): void {
   const connection = createConnection(ProposedFeatures.all);
   const documents  = new TextDocuments(TextDocument);
-  // One in-flight lint per document. UE editor startup is expensive — stacking
-  // concurrent runs against the same project would just contend.
-  const inflight   = new Map<string, Promise<void>>();
+  const states     = new Map<string, DocState>();
+  const stateOf    = (uri: string): DocState => {
+    let s = states.get(uri);
+    if (!s) { s = { astDiagnostics: [], engineDiagnostics: [] }; states.set(uri, s); }
+    return s;
+  };
 
   connection.onInitialize((_params: InitializeParams): InitializeResult => ({
     capabilities: {
@@ -113,14 +147,78 @@ function startLspServer(): void {
 
   connection.onDidChangeConfiguration(async () => {
     await refreshSettings(connection);
-    for (const doc of documents.all()) { void runLint(connection, inflight, doc); }
+    for (const doc of documents.all()) {
+      runAstPasses(connection, stateOf(doc.uri), doc);
+      void runEngineLint(connection, stateOf(doc.uri), doc);
+    }
   });
 
-  documents.onDidOpen(async (e) => { void runLint(connection, inflight, e.document); });
-  documents.onDidSave(async (e) => { void runLint(connection, inflight, e.document); });
+  documents.onDidOpen(async (e) => {
+    const s = stateOf(e.document.uri);
+    runAstPasses(connection, s, e.document);
+    // Skip the engine pass on didOpen — first-open often coincides with
+    // workspace startup; let the user save when they want full validation.
+    publish(connection, e.document.uri, s);
+  });
+
+  documents.onDidChangeContent((e) => {
+    const s = stateOf(e.document.uri);
+    if (s.astDebounce) { clearTimeout(s.astDebounce); }
+    s.astDebounce = setTimeout(() => {
+      runAstPasses(connection, s, e.document);
+      publish(connection, e.document.uri, s);
+    }, 50);
+  });
+
+  documents.onDidSave(async (e) => {
+    const s = stateOf(e.document.uri);
+    runAstPasses(connection, s, e.document);
+    publish(connection, e.document.uri, s);
+    void runEngineLint(connection, s, e.document);
+  });
+
+  documents.onDidClose((e) => {
+    const s = states.get(e.document.uri);
+    if (s?.astDebounce) { clearTimeout(s.astDebounce); }
+    states.delete(e.document.uri);
+    connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
+  });
 
   documents.listen(connection);
   connection.listen();
+}
+
+// ─── AST-only passes (didOpen / didChange) ─────────────────────────────────
+function runAstPasses(
+  connection: ReturnType<typeof createConnection>,
+  state: DocState,
+  doc: TextDocument,
+): void {
+  if (doc.languageId !== 'bac') { return; }
+  const diags  = new BacDiagnostics();
+  const tokens = tokenize(doc.getText(), diags);
+  const ast    = parse(tokens, diags);
+  runContractCheck(ast, diags);
+  runReferenceCheck(ast, diags);
+  runTypeCheck(ast, diags);
+  state.astDiagnostics = diags.items.map(toLspDiagnosticFromBac);
+}
+
+function publish(
+  connection: ReturnType<typeof createConnection>,
+  uri: string,
+  state: DocState,
+): void {
+  // Engine diagnostics override AST diagnostics by (code, line, column) — same
+  // (code, location) coming from both pipelines means the engine pass already
+  // confirmed it; no point in double-publishing.
+  const seen = new Set<string>();
+  const merged: Diagnostic[] = [];
+  const keyOf = (d: Diagnostic): string =>
+    `${d.code}|${d.range.start.line}|${d.range.start.character}`;
+  for (const d of state.engineDiagnostics) { merged.push(d); seen.add(keyOf(d)); }
+  for (const d of state.astDiagnostics)    { if (!seen.has(keyOf(d))) { merged.push(d); } }
+  connection.sendDiagnostics({ uri, diagnostics: merged });
 }
 
 async function refreshSettings(connection: ReturnType<typeof createConnection>): Promise<void> {
@@ -132,62 +230,84 @@ async function refreshSettings(connection: ReturnType<typeof createConnection>):
   }
 }
 
-async function runLint(
+async function runEngineLint(
   connection: ReturnType<typeof createConnection>,
-  inflight: Map<string, Promise<void>>,
+  state: DocState,
   doc: TextDocument,
 ): Promise<void> {
   if (!settings.enable)              { return; }
   if (doc.languageId !== 'bac')      { return; }
-
   const fsPath = URI.parse(doc.uri).fsPath;
   if (!fsPath || !fsPath.endsWith('.bac')) { return; }
-  if (inflight.has(doc.uri))         { return; }
-
-  const job = doLint(connection, doc, fsPath).finally(() => {
-    inflight.delete(doc.uri);
-  });
-  inflight.set(doc.uri, job);
-  await job;
-}
-
-async function doLint(
-  connection: ReturnType<typeof createConnection>,
-  doc: TextDocument,
-  fsPath: string,
-): Promise<void> {
+  if (state.engineInflight)          { return; }   // coalesce
   if (!settings.projectPath) {
-    connection.sendDiagnostics({ uri: doc.uri, diagnostics: [] });
     connection.console.warn(
-      "bac: 'bac.projectPath' is not configured — set it to the .uproject of a project that loads the BlueprintAsCode plugin.",
+      "bac: 'bac.projectPath' is not configured — set it to the .uproject of a project that loads the BlueprintAsCode plugin. " +
+      "AST-only diagnostics still work; engine-coupled checks are disabled.",
     );
+    state.engineDiagnostics = [];
+    publish(connection, doc.uri, state);
     return;
   }
 
-  let result: BacLintResult;
-  try {
-    result = await invokeCommandlet(fsPath);
-  } catch (err) {
-    connection.console.error(`bac.lint failed for ${fsPath}: ${(err as Error).message}`);
-    connection.sendDiagnostics({
-      uri: doc.uri,
-      diagnostics: [{
+  state.engineInflight = (async (): Promise<void> => {
+    let result: BacLintResult;
+    try {
+      result = await invokeCommandlet(fsPath);
+    } catch (err) {
+      connection.console.error(`bac.lint failed for ${fsPath}: ${(err as Error).message}`);
+      state.engineDiagnostics = [{
         severity: DiagnosticSeverity.Information,
         message:  `bac.lint did not complete: ${(err as Error).message}`,
         range:    { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
         source:   'bac',
-      }],
-    });
-    return;
-  }
-
-  connection.sendDiagnostics({
-    uri: doc.uri,
-    diagnostics: (result.diagnostics ?? []).map(toLspDiagnostic),
-  });
+      }];
+      publish(connection, doc.uri, state);
+      return;
+    }
+    state.engineDiagnostics = (result.diagnostics ?? []).map(toLspDiagnostic);
+    publish(connection, doc.uri, state);
+  })().finally(() => { state.engineInflight = undefined; });
+  await state.engineInflight;
 }
 
-function toLspDiagnostic(d: BacDiagnostic): Diagnostic {
+// AST-pass diagnostics arrive in the TS-internal `BacDiagnostic` shape; convert
+// to LSP using the same point→1-char-range trick as the engine path.
+function toLspDiagnosticFromBac(d: BacDiagnostic): Diagnostic {
+  const startLine = Math.max(0, d.location.line - 1);
+  const startCol  = Math.max(0, d.location.column - 1);
+  const sev =
+    d.severity === 'error'   ? DiagnosticSeverity.Error :
+    d.severity === 'warning' ? DiagnosticSeverity.Warning :
+                               DiagnosticSeverity.Information;
+  const tail = [d.hint, ...(d.fixes ?? []).map((f) => `fix: ${f}`)].filter(Boolean).join('\n');
+  const related: DiagnosticRelatedInformation[] | undefined =
+    d.notes?.length
+      ? d.notes.map((n) => ({
+          location: {
+            uri: '',
+            range: {
+              start: { line: Math.max(0, n.location.line - 1), character: Math.max(0, n.location.column - 1) },
+              end:   { line: Math.max(0, n.location.line - 1), character: Math.max(0, n.location.column - 1) + 1 },
+            },
+          },
+          message: n.message,
+        }))
+      : undefined;
+  return {
+    severity: sev,
+    range:    {
+      start: { line: startLine, character: startCol },
+      end:   { line: startLine, character: startCol + 1 },
+    },
+    code:     d.code,
+    message:  tail ? `${d.message}\n${tail}` : d.message,
+    source:   'bac',
+    relatedInformation: related,
+  };
+}
+
+function toLspDiagnostic(d: BacDiagnostic_LintWire): Diagnostic {
   // BAC locations are 1-based; LSP positions are 0-based.
   // The validator gives us a single point; synthesize a 1-char range so the
   // squiggle is visible.
