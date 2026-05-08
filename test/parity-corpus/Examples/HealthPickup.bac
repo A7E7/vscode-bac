@@ -1,0 +1,99 @@
+// Reference example: a replicated health pickup with a respawn cycle.
+// Exercises components, replication, latent flow, casting, interfaces,
+// pure functions, delegate binds, and construction-time setup.
+
+import { IInteractable } from "/Game/Interfaces/IInteractable"
+import { HealthComponent } from "/Game/Components/HealthComponent"
+
+@blueprintable
+@replicated_default(replicates=true, alwaysRelevant=false)
+class HealthPickup : Actor implements IInteractable {
+
+  // ─── Components ─────────────────────────────────────────────
+  component Root: SceneComponent
+  component Mesh: StaticMeshComponent attach Root {
+    StaticMesh = asset("/Game/Meshes/SM_HealthOrb")
+    Material   = asset("/Game/Materials/M_Glow")
+  }
+  component Trigger: SphereComponent attach Root {
+    SphereRadius           = 80.0
+    CollisionProfileName   = "OverlapAllDynamic"
+  }
+  component Particles: ParticleSystemComponent attach Mesh {
+    Template       = asset("/Game/FX/PS_Sparkle")
+    bAutoActivate  = true
+  }
+
+  // ─── Variables ──────────────────────────────────────────────
+  @editable @category("Pickup")
+  var HealAmount: float = 25.0
+
+  @editable @category("Pickup")
+  var RespawnTime: float = 10.0
+
+  @replicated(repnotify = OnRep_IsActive)
+  var IsActive: bool = true
+
+  // ─── Construction ──────────────────────────────────────────
+  construction {
+    Mesh.SetVisibility(IsActive)
+  }
+
+  // ─── Built-in events ───────────────────────────────────────
+  event BeginPlay() {
+    super.BeginPlay()
+    Trigger.OnComponentBeginOverlap += OnTriggerOverlap
+  }
+
+  // ─── Function bound to a component delegate ────────────────
+  function OnTriggerOverlap(
+    overlappedComp: PrimitiveComponent,
+    other: Actor,
+    otherComp: PrimitiveComponent,
+    otherBodyIndex: int,
+    fromSweep: bool,
+    sweepResult: HitResult,
+  ) {
+    if (!IsActive) { return }
+
+    if (let character = other as Character) {
+      if (let health = character.FindComponentByClass<HealthComponent>()) {
+        health.AddHealth(HealAmount)
+        StartRespawn()
+      }
+    }
+  }
+
+  // ─── Server-only latent flow (BP "Custom Event" w/ Run on Server) ──
+  @event(runson = server, reliable = true)
+  event StartRespawn() {
+    IsActive = false
+    Mesh.SetVisibility(false)
+    Trigger.SetCollisionEnabled(ECollisionEnabled.NoCollision)
+
+    await Delay(RespawnTime)
+
+    IsActive = true
+    Mesh.SetVisibility(true)
+    Trigger.SetCollisionEnabled(ECollisionEnabled.QueryOnly)
+  }
+
+  // ─── RepNotify callback ────────────────────────────────────
+  function OnRep_IsActive() {
+    Particles.SetActive(IsActive)
+    if (IsActive) {
+      let pitch = RandomFloatInRange(0.9, 1.1)
+      PlaySoundAtLocation(asset("/Game/Audio/Respawn"), GetActorLocation(), pitch)
+    }
+  }
+
+  // ─── Pure function (no exec pin in BP) ─────────────────────
+  pure function ScaledHeal(scalar: float): float {
+    return HealAmount * scalar
+  }
+
+  // ─── Interface implementation ──────────────────────────────
+  function Interact(instigator: Actor) implements IInteractable.Interact {
+    OnTriggerOverlap(Trigger, instigator, none, 0, false, default<HitResult>())
+  }
+}

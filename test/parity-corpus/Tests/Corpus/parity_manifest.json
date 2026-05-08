@@ -1,0 +1,87 @@
+{
+  "$schema": "./parity_manifest.schema.json",
+  "version": 1,
+  "description": "Validator parity contract between the C++ plugin and the vscode-bac TypeScript port. Each entry names a fixture and the diagnostic codes the validator must emit (with exact counts) when run with the named pass set. Both ports load the same fixture and assert the same outcome.",
+  "fixtures": [
+    {
+      "path": "Examples/HealthPickup.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": {}
+    },
+    {
+      "path": "Tests/Corpus/Validate_BadDecoratorTarget.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2101": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_AwaitInPure.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2110": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_AwaitInFunction.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2111": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_AttachTypo.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2200": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_AttachCycle.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2202": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_DuplicateMember.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2210": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_RepNotifyMissing.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2220": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_DuplicateLocal.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2230": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_DuplicateParam.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2232": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_ReplicatedWithoutClass.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2240": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_GenericArityBad.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2310": 2 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_LiteralTypeMismatch.bac",
+      "passes": "AstOnly",
+      "expected_error_codes": { "BAC2321": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_IdentifierUnresolved.bac",
+      "passes": "AstOnly+Identifiers",
+      "expected_error_codes": { "BAC2310": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_CallUnresolved.bac",
+      "passes": "AstOnly+Identifiers",
+      "expected_error_codes": { "BAC2311": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_IdentifierParentResolved.bac",
+      "passes": "AstOnly+Identifiers",
+      "expected_error_codes": { "BAC2310": 0, "BAC2311": 0 }
+    }
+  ]
+}

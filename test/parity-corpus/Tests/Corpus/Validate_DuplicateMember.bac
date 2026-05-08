@@ -1,0 +1,6 @@
+// Fixture: two 'Foo' variables — must emit BAC2210.
+
+class X : Object {
+  var Foo: int = 0
+  var Foo: float = 1.0
+}

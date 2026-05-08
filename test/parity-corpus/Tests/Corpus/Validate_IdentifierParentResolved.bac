@@ -1,0 +1,10 @@
+// Fixture: bare identifiers `CustomTimeDilation` (AActor C++ property) and
+// `SetActorHiddenInGame` (AActor UFUNCTION) must resolve via the parent class
+// chain. Validator should produce no BAC2310/BAC2311.
+
+class T : Actor {
+  function Use(): float {
+    SetActorHiddenInGame(true)
+    return CustomTimeDilation
+  }
+}

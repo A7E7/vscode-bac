@@ -1,0 +1,6 @@
+// Fixture: Set takes 1 arg, given 2 — must emit BAC2310. Map missing args also.
+
+class X : Object {
+  var Bad: Set<int, float>
+  var AlsoBad: Map<int>
+}

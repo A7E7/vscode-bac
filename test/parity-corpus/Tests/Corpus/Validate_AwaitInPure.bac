@@ -1,0 +1,8 @@
+// Fixture: pure function with await — must emit BAC2110.
+
+class X : Object {
+  pure function Bad(): float {
+    await Delay(1.0)
+    return 0.0
+  }
+}

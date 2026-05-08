@@ -1,0 +1,6 @@
+// Fixture: A attaches to B, B attaches to A — must emit BAC2202 once.
+
+class X : Actor {
+  component A: SceneComponent attach B
+  component B: SceneComponent attach A
+}

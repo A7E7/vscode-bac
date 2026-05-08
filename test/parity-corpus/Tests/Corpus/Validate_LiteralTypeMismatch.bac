@@ -1,0 +1,5 @@
+// Fixture: int variable initialized with a string — must emit BAC2321.
+
+class X : Object {
+  var Wrong: int = "twenty-five"
+}

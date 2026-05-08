@@ -33,6 +33,33 @@ Every grammar change should:
 If your grammar change requires the upstream parser in BlueprintAsCode to
 change too, please file a parallel issue there.
 
+## Validator parity corpus (vendored at `test/parity-corpus/`)
+
+The TS validator and the BlueprintAsCode plugin's C++ validator share a
+contract: both must emit the same diagnostic codes (and counts) for every
+`Validate_*.bac` fixture. The contract is pinned in the plugin's
+`Tests/Corpus/parity_manifest.json`.
+
+For CI, `test/parity-corpus/` is a vendored copy of the plugin's corpus —
+the public CI can't reach the private plugin repo, so the snapshot lives
+here. The parity test (`lsp/src/validate/parity-test.ts`) reads it
+automatically when `BAC_PLUGIN_ROOT` isn't set.
+
+When the plugin updates its manifest or fixtures, copy the updated files
+over:
+
+```sh
+PLUGIN=~/UnrealProjects/BACSample/Plugins/BlueprintAsCode
+DST=~/UnrealProjects/vscode-bac/test/parity-corpus
+
+cp "$PLUGIN/Tests/Corpus/parity_manifest"*.json    "$DST/Tests/Corpus/"
+cp "$PLUGIN/Tests/Corpus/Validate_"*.bac           "$DST/Tests/Corpus/"
+cp "$PLUGIN/Examples/HealthPickup.bac"             "$DST/Examples/"
+```
+
+If you forget, CI catches it: the parity test fails when the vendored
+manifest disagrees with the TS validator's behaviour.
+
 ## License
 
 By contributing, you agree your contribution is MIT-licensed (see `LICENSE`).

@@ -1,0 +1,8 @@
+// Fixture: bare call `DoesNotExist()` doesn't resolve to a script function,
+// inherited UFUNCTION, or a built-in Kismet library entry. Expect BAC2311.
+
+class T : Actor {
+  function Use() {
+    DoesNotExist()
+  }
+}

@@ -1,0 +1,7 @@
+// Fixture: @replicated(repnotify = OnRep_Foo) — but no function OnRep_Foo declared.
+// Must emit BAC2220.
+
+class X : Object {
+  @replicated(repnotify = OnRep_Foo)
+  var Foo: int = 0
+}

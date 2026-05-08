@@ -1,0 +1,8 @@
+// Fixture: bare identifier `BogusVar` doesn't resolve to anything in scope.
+// BacIdentifierCheck should flag this as BAC2310.
+
+class T : Object {
+  function Use() {
+    PrintString(BogusVar)
+  }
+}

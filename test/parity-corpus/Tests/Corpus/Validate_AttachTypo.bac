@@ -1,0 +1,8 @@
+// Fixture: 'Trigger' attaches to 'Reot' (typo of 'Root') — must emit BAC2200
+// with 'did you mean Root?' hint and a candidate fix.
+
+class X : Actor {
+  component Root: SceneComponent
+  component Mesh: StaticMeshComponent attach Root
+  component Trigger: SphereComponent attach Reot
+}

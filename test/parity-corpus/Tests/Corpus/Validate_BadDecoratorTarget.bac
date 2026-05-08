@@ -1,0 +1,6 @@
+// Fixture: @editable on a function — must emit BAC2101 (decorator on wrong target).
+
+class X : Object {
+  @editable
+  function Foo() {}
+}

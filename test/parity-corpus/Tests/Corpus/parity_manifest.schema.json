@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blueprintascode.dev/parity_manifest.schema.json",
+  "title": "BAC validator parity manifest",
+  "description": "Wire-stable contract between the C++ validator (this plugin) and the TypeScript port (vscode-bac LSP). Both ports load every fixture and assert the same expected_error_codes outcome.",
+  "type": "object",
+  "required": ["version", "fixtures"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema":     { "type": "string" },
+    "version":     { "const": 1 },
+    "description": { "type": "string" },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "passes", "expected_error_codes"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path relative to the plugin root, e.g. Tests/Corpus/Validate_Foo.bac."
+          },
+          "passes": {
+            "enum": ["AstOnly", "AstOnly+Identifiers"],
+            "description": "Pass set the validator must run. AstOnly is portable across both ports; AstOnly+Identifiers needs UE reflection (C++ side runs it; TS port currently runs the AstOnly subset and skips identifier-resolved counts)."
+          },
+          "expected_error_codes": {
+            "type": "object",
+            "patternProperties": {
+              "^BAC[0-9]{4}$": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": false,
+            "description": "Map of diagnostic code → exact expected count of error-severity diagnostics. A count of 0 asserts the code does NOT appear (positive-case fixtures). Non-listed codes are unconstrained."
+          }
+        }
+      }
+    }
+  }
+}

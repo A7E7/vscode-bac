@@ -1,0 +1,55 @@
+name: ci
+
+# Public-repo CI for vscode-bac. Two independent jobs run on every push to
+# main and every PR; both are cheap (sub-minute) and use only free
+# GitHub-hosted runners.
+#
+#   - tree-sitter: builds the grammar and runs `tree-sitter test` against
+#     `test/corpus/*.txt`. Catches grammar regressions.
+#   - lsp: builds the TypeScript LSP and runs `npm run parity` against the
+#     vendored snapshot at `test/parity-corpus/`. Catches drift between the
+#     TS validator and the BAC plugin's parity_manifest.json.
+#
+# The vendored corpus is a copy of the BlueprintAsCode plugin's
+# Tests/Corpus/parity_manifest.json + the matching Validate_*.bac fixtures.
+# When the plugin updates its manifest, copy the new files over via the
+# script in CONTRIBUTING.md (or the parity test will fail here, which is
+# the right signal).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tree-sitter:
+    name: tree-sitter test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build  # tree-sitter generate
+      - run: npm test       # tree-sitter test
+
+  lsp:
+    name: LSP build + parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: lsp/package-lock.json
+      - working-directory: lsp
+        run: npm ci
+      - working-directory: lsp
+        run: npm run build
+      - name: parity (vendored corpus)
+        working-directory: lsp
+        run: node out/validate/parity-test.js ../test/parity-corpus

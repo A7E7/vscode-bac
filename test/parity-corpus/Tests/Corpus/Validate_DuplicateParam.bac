@@ -1,0 +1,5 @@
+// Fixture: two parameters named 'x' — must emit BAC2232.
+
+class X : Object {
+  function Bad(x: int, x: float) {}
+}

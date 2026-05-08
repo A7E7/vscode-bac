@@ -46,12 +46,20 @@ function resolvePluginRoot(): string {
   const fromEnv = process.env.BAC_PLUGIN_ROOT;
   if (fromEnv) { return path.resolve(fromEnv); }
 
-  // From `~/UnrealProjects/vscode-bac/lsp/out/validate/parity-test.js` →
-  // `~/UnrealProjects/BACSample/Plugins/BlueprintAsCode`. Five hops up,
-  // then sideways. Brittle if either repo moves; that's why the env var
-  // exists.
+  // Two fallbacks, tried in order:
+  //   1. Sibling-repo layout — `~/UnrealProjects/vscode-bac/lsp/out/validate/`
+  //      → `~/UnrealProjects/BACSample/Plugins/BlueprintAsCode/`. Works on
+  //      the dev machine when both repos are checked out side by side.
+  //   2. Vendored corpus at `<vscode-bac>/test/parity-corpus/`. Used by CI
+  //      (the public repo can't access the private plugin) and by anyone
+  //      cloning vscode-bac standalone.
   const here = __dirname; // .../lsp/out/validate
-  return path.resolve(here, '..', '..', '..', '..', 'BACSample', 'Plugins', 'BlueprintAsCode');
+  const sibling = path.resolve(here, '..', '..', '..', '..', 'BACSample', 'Plugins', 'BlueprintAsCode');
+  if (fs.existsSync(path.join(sibling, 'Tests', 'Corpus', 'parity_manifest.json'))) {
+    return sibling;
+  }
+  // From .../lsp/out/validate/ → .../test/parity-corpus/
+  return path.resolve(here, '..', '..', '..', 'test', 'parity-corpus');
 }
 
 function loadManifest(pluginRoot: string): Manifest {
