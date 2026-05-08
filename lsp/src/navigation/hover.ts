@@ -213,6 +213,14 @@ function formatClassMember(m: ast.BacMember): string {
     }
     case 'construction':
       return '`construction` block';
+    case 'widget': {
+      const childCount = m.children.length;
+      const tail = childCount === 0 ? '' : ` (${childCount} child widget${childCount === 1 ? '' : 's'})`;
+      return [
+        `\`widget\` **${m.name}**: \`${formatType(m.type)}\`${tail}`,
+        decoratorsBlock,
+      ].filter(Boolean).join('\n');
+    }
   }
 }
 

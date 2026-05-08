@@ -12,6 +12,23 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Widget Blueprint compatibility, Phase 1 (`widget` keyword)
+- New `Kw_Widget` token + `BacWidgetDecl` AST + `parseWidgetDecl`
+  recursive parser to mirror the plugin's Phase 1 widget-tree support.
+  Children use the bare `Name: Type { ... }` form; property overrides
+  and child widgets interleave inside the body.
+- Wire-stable: lexer + parser + AST changed atomically with the plugin
+  side. The validator passes (Contract / Reference / Type) treat
+  `widget` members as no-ops for v1 — no per-construct widget-tree
+  validation in the TS port yet (the plugin's generator does it via
+  reflection at lower-time).
+- Hover `formatClassMember` learns the new `widget` arm.
+- Diagnostic codes reserved on the plugin side: `BAC3121–BAC3129`
+  (widget-tree lowering errors). The LSP surfaces them via the
+  existing `bac.sync.events` push channel like other `BAC3xxx` codes.
+- Phases 2 (slot properties), 3 (bindings), 4 (BindWidget + events +
+  animations) are tracked as gap **6** in the plugin's ROADMAP.
+
 ### Added — wire-stable exec command `bac.sync.resolve` (gap 5)
 - New plugin-side exec command opens a side-by-side `.bac` vs canonical
   diff dialog in the UE editor for the named asset. The LSP can wire

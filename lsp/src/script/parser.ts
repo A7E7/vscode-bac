@@ -272,9 +272,10 @@ class Parser {
       }
       case BacTokenKind.Kw_Event:        return this.parseEventDecl(decorators);
       case BacTokenKind.Kw_Construction: return this.parseConstructionDecl(decorators);
+      case BacTokenKind.Kw_Widget:       return this.parseWidgetDecl(decorators);
       default: {
         this.error(
-          `Expected class member (var, component, function, event, construction) but got '${tokenKindName(this.current().kind)}'.`,
+          `Expected class member (var, component, function, event, construction, widget) but got '${tokenKindName(this.current().kind)}'.`,
           this.current().location, 'BAC1021');
         return undefined;
       }
@@ -393,6 +394,71 @@ class Parser {
     this.advance(); // 'construction'
     const body = this.parseBlock();
     return { kind: 'construction', location, decorators, body };
+  }
+
+  // `widget Name: Type { Body }` at the class top level. Body holds two
+  // kinds of entries, freely interleaved:
+  //   1. Property overrides — `Name = Expr`
+  //   2. Nested child widgets — `ChildName: ChildType { ... }`
+  // Children use the bare `Name: Type` form (no leading `widget` keyword)
+  // so the syntax doesn't get noisy.
+  private parseWidgetDecl(decorators: ast.BacDecorator[]): ast.BacWidgetDecl {
+    const out: ast.BacWidgetDecl = {
+      kind: 'widget', location: this.current().location, decorators,
+      name: '', type: { location: NO_LOCATION, baseName: '', genericArgs: [], arrayDepth: 0 },
+      defaults: [], children: [],
+    };
+    this.advance(); // 'widget'
+    out.name = this.expectIdentifier('widget name');
+    if (!this.expect(BacTokenKind.Colon, "':' before widget type")) { return out; }
+    out.type = this.parseTypeRef();
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open widget body")) { return out; }
+    this.parseWidgetBody(out);
+    this.expect(BacTokenKind.RBrace, "'}' to close widget body");
+    return out;
+  }
+
+  private parseChildWidgetDecl(): ast.BacWidgetDecl | undefined {
+    const out: ast.BacWidgetDecl = {
+      kind: 'widget', location: this.current().location, decorators: [],
+      name: '', type: { location: NO_LOCATION, baseName: '', genericArgs: [], arrayDepth: 0 },
+      defaults: [], children: [],
+    };
+    out.name = this.expectIdentifier('child widget name');
+    if (!out.name) { return undefined; }
+    if (!this.expect(BacTokenKind.Colon, "':' before child widget type")) { return out; }
+    out.type = this.parseTypeRef();
+    if (this.match(BacTokenKind.LBrace)) {
+      this.parseWidgetBody(out);
+      this.expect(BacTokenKind.RBrace, "'}' to close child widget body");
+    }
+    return out;
+  }
+
+  private parseWidgetBody(target: ast.BacWidgetDecl): void {
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+
+      // Lookahead: `identifier ':'` is a child widget; `identifier '='` is
+      // a property override.
+      if (this.check(BacTokenKind.Identifier) && this.at(1).kind === BacTokenKind.Colon) {
+        const child = this.parseChildWidgetDecl();
+        if (child) { target.children.push(child); }
+        this.skipNewlines();
+        this.match(BacTokenKind.Comma);
+        continue;
+      }
+      const location = this.current().location;
+      const name = this.expectIdentifier('widget property name');
+      if (!name) { break; }
+      if (!this.expect(BacTokenKind.Assign, "'=' between property name and value")) { break; }
+      const value = this.parseExpr();
+      if (!value) { break; }
+      target.defaults.push({ name, value, location });
+      this.skipNewlines();
+      this.match(BacTokenKind.Comma);
+    }
   }
 
   private parseParam(): ast.BacParam | undefined {

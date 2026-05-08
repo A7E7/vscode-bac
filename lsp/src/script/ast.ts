@@ -173,7 +173,7 @@ export interface BacAssignment {
 
 export type BacMember =
   | BacVariableDecl | BacComponentDecl | BacFunctionDecl
-  | BacEventDecl    | BacConstructionDecl;
+  | BacEventDecl    | BacConstructionDecl | BacWidgetDecl;
 
 interface BacMemberBase {
   location:   BacSourceLocation;
@@ -212,6 +212,13 @@ export interface BacEventDecl extends BacMemberBase {
 export interface BacConstructionDecl extends BacMemberBase {
   kind:  'construction';
   body:  BacBlockStmt;
+}
+export interface BacWidgetDecl extends BacMemberBase {
+  kind:     'widget';
+  name:     string;
+  type:     BacTypeRef;
+  defaults: BacAssignment[];
+  children: BacWidgetDecl[];
 }
 
 // ─── Top level ──────────────────────────────────────────────────────────────
