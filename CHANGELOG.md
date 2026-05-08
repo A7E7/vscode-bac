@@ -12,6 +12,14 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — UE-native container + soft-ref synonyms in `genericArity`
+- `TArray`, `TSet`, `TMap`, `TSubclassOf`, `TSoftObjectPtr`, `TSoftClassPtr`
+  now recognised as synonyms for `Set`, `Map`, `Class`, `SoftObject`,
+  `SoftClass` (no `[]` equivalent for `TArray<T>` since the BAC form is
+  `T[]`). The TS validator stops flagging `TArray<int>` etc. as unknown
+  generics, matching the plugin's resolver. Wire-stable, atomic with
+  the plugin commit.
+
 ### Added — code-action quick fixes for `add X before Y` + bidirectional anchor search
 - `BAC2240` (replicated decorator missing class-level `@replicated_default`)
   was emitting a candidate fix the LSP couldn't translate to a clickable

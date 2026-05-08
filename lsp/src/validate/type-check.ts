@@ -11,13 +11,28 @@ export function runTypeCheck(scriptAst: ast.BacScriptAst, out: BacDiagnostics): 
 }
 
 // Returns expected type-arg count, or -1 for unknown generics.
+//
+// Both BAC vocabulary (`Set<T>`, `Map<K,V>`, `Class<T>`, `Soft*<T>`) and the
+// UE-native names (`TArray<T>`, `TSet<T>`, `TMap<K,V>`, `TSoftObjectPtr<T>`,
+// `TSoftClassPtr<T>`, `TSubclassOf<T>`) are accepted as synonyms — anyone
+// copying a BP type from C++ familiarity expects the T-prefixed forms to
+// work. The transcriber always emits the BAC vocabulary, so a round-trip
+// canonicalises onto one form.
 function genericArity(name: string): number {
   switch (name) {
+    // BAC vocabulary
     case 'Set':        return 1;
     case 'Map':        return 2;
     case 'Class':      return 1;
     case 'SoftClass':  return 1;
     case 'SoftObject': return 1;
+    // UE-native synonyms
+    case 'TArray':         return 1;
+    case 'TSet':           return 1;
+    case 'TMap':           return 2;
+    case 'TSubclassOf':    return 1;
+    case 'TSoftObjectPtr': return 1;
+    case 'TSoftClassPtr':  return 1;
   }
   return -1;
 }
