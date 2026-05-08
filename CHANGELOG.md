@@ -12,6 +12,13 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `@macro_library` class decorator (gap 1b Phase 1)
+- Contract-check accepts `@macro_library` as a class-only zero-arg
+  decorator alongside `@blueprintable`. The plugin generator flips
+  `Blueprint->BlueprintType` to `BPTYPE_MacroLibrary` when present.
+  Wire-stable, atomic with BAC plugin commit d902c12. Parity test
+  unchanged at 13/16 PASS.
+
 ### Added — `macro` keyword (gap 1a Phase 1, declaration surface)
 - New `Kw_Macro` token + `BacMacroDecl` AST + `parseMacroDecl` mirroring
   the function parser. The plugin generator stores macros on

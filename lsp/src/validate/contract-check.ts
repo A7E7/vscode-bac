@@ -99,7 +99,8 @@ function validateDecorator(d: ast.BacDecorator, target: Target, out: BacDiagnost
       if (d.args.length !== 0) { emitBadArity(out, d, 0, d.args.length); }
       return;
     }
-    case 'blueprintable': {
+    case 'blueprintable':
+    case 'macro_library': {
       if (target !== 'class') { emitWrongTarget(out, d, target, 'class'); return; }
       if (d.args.length !== 0) { emitBadArity(out, d, 0, d.args.length); }
       return;
