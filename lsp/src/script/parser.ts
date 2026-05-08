@@ -74,6 +74,19 @@ class Parser {
     this.advance();
     return name;
   }
+  // Property-override name, possibly dotted: `Foo`, `Slot.Anchors`, `A.B.C`.
+  // Stored verbatim in BacAssignment.name; the plugin generator splits on
+  // the first dot to dispatch (Slot.* → child slot, others → widget).
+  private expectAssignmentName(what: string): string {
+    let name = this.expectIdentifier(what);
+    if (!name) { return name; }
+    while (this.match(BacTokenKind.Dot)) {
+      const next = this.expectIdentifier("identifier after '.'");
+      if (!next) { break; }
+      name += '.' + next;
+    }
+    return name;
+  }
   private error(message: string, location: BacSourceLocation, code: string): void {
     this.diags.error(message, location, code);
   }
@@ -316,7 +329,7 @@ class Parser {
         this.skipNewlines();
         if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
         const location = this.current().location;
-        const name = this.expectIdentifier('property name');
+        const name = this.expectAssignmentName('property name');
         if (!name) { break; }
         if (!this.expect(BacTokenKind.Assign, "'=' between property name and value")) { break; }
         const value = this.parseExpr();
@@ -450,7 +463,7 @@ class Parser {
         continue;
       }
       const location = this.current().location;
-      const name = this.expectIdentifier('widget property name');
+      const name = this.expectAssignmentName('widget property name');
       if (!name) { break; }
       if (!this.expect(BacTokenKind.Assign, "'=' between property name and value")) { break; }
       const value = this.parseExpr();

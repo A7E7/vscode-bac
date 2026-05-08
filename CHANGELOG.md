@@ -12,6 +12,19 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Widget Blueprint compatibility, Phase 2 (slot properties)
+- Property-override names now accept dotted paths via the new
+  `expectAssignmentName` helper. Wire-stable parser change atomic
+  with the plugin side. The plugin splits names on the first dot to
+  route `Slot.X` assignments to the widget's `UPanelSlot`.
+- New diagnostic code reserved on the plugin side: `BAC3130` —
+  `Slot.X` on a widget with no slot. Surfaces via the existing
+  `bac.sync.events` push channel.
+- No AST shape change — the dotted name is stored verbatim in
+  `BacAssignment.name`. Validators and navigation continue to treat
+  it as a single string for now; per-token highlighting of the dotted
+  path can be a follow-up if it matters.
+
 ### Added — Widget Blueprint compatibility, Phase 1 (`widget` keyword)
 - New `Kw_Widget` token + `BacWidgetDecl` AST + `parseWidgetDecl`
   recursive parser to mirror the plugin's Phase 1 widget-tree support.
