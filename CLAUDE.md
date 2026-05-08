@@ -4,6 +4,25 @@ This file is loaded as system context for any Claude session in this repo.
 Keep it tight; don't repeat what's documented in [ARCHITECTURE.md](ARCHITECTURE.md)
 or [CHANGELOG.md](CHANGELOG.md). Cross-link instead.
 
+## Shared-state map (where this repo touches the others)
+
+Three sibling repos (`vscode-bac`, `prettier-plugin-bac`,
+[`BlueprintAsCode` plugin](https://github.com/A7E7/BlueprintAsCode)) — every
+edit in this list needs a coordinated change in the other side(s). The
+detailed update protocol below references these touchpoints; this map is
+the cheat-sheet at a glance.
+
+| Touched here                                  | Also moves                                                                 |
+|-----------------------------------------------|----------------------------------------------------------------------------|
+| `lsp/src/script/**` or `lsp/src/format/**`    | `prettier-plugin-bac` — rerun `scripts/build.js` so the published `dist/` doesn't drift |
+| Diagnostic codes (`BAC*`)                     | both this `CHANGELOG.md` *Wire-stable contracts* AND the plugin's `CHANGELOG.md` + `ARCHITECTURE.md` codes table |
+| Completion-server NDJSON shape (request/response/push) | both repos' CHANGELOGs; LSP client (`lsp/src/completion/engine-proxy.ts`); plugin server (`BacCompletionServer.cpp`) |
+| `bac.lint` / `bac.sync*` JSON output          | both repos' CHANGELOGs; LSP wrapper (`server.ts`); plugin command (`BacConsoleCommands.cpp` / `BacSyncCommand.cpp`) |
+| `<Asset>.bac.sync.json` schema                | both repos' CHANGELOGs; plugin reader/writer (`BacSyncMetadata.cpp`)       |
+| Sidecar file extensions (`FBacDocument::*Extension()`) | both repos; LSP path utilities; plugin `BacPathMap.cpp`                    |
+| Add / rename a `bac.*` LSP setting            | `editors/code/package.json` `contributes.configuration` schema             |
+| Add / rename a tree-sitter node kind          | `queries/highlights.scm` + `editors/code/syntaxes/bac.tmLanguage.json` (or its TextMate analogue) |
+
 ## Documentation update protocol
 
 When you change code, update docs in the **same change**:
@@ -16,7 +35,8 @@ When you change code, update docs in the **same change**:
 | Add a new module under `lsp/src/`       | `ARCHITECTURE.md` *Components* tree                            |
 | Cross the line between this repo and the plugin | `ARCHITECTURE.md` *Boundaries* table + a parallel commit/issue in the plugin repo |
 | Change formatter output (anything that affects formatted-file content) | `CHANGELOG.md` *Wire-stable contracts* — the canonical style is wire-stable; bump major if the change isn't backwards-compatible |
-| Change formatter code shared by the LSP and the standalone plugin | rebuild the sibling `prettier-plugin-bac` repo (`cd ../prettier-plugin-bac && node scripts/build.js`) so the published package doesn't drift |
+| Change anything under `lsp/src/script/**` or `lsp/src/format/**` (lexer, parser, AST, diagnostics, formatter) | rebuild the sibling `prettier-plugin-bac` repo (`cd ../prettier-plugin-bac && node scripts/build.js`) — its `dist/` bundles BOTH `script/` and `format/` so any change to either drifts the npm package |
+| Add / rename a `bac.*` LSP setting       | extend `editors/code/package.json` `contributes.configuration` schema so VS Code shows the setting under Settings → Extensions → Blueprint as Code |
 | Bump the extension version              | `editors/code/package.json` + `CHANGELOG.md` (move `[Unreleased]` to a new version section, update compare links at the bottom) |
 
 `README.md` should stay terse — it's the marketing surface. Deep docs go in
