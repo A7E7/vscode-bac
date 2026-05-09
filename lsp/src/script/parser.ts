@@ -423,9 +423,10 @@ class Parser {
       case BacTokenKind.Kw_Widget:       return this.parseWidgetDecl(decorators);
       case BacTokenKind.Kw_Macro:        return this.parseMacroDecl(decorators);
       case BacTokenKind.Kw_Defaults:     return this.parseDefaultsBlock(decorators);
+      case BacTokenKind.Kw_Settings:     return this.parseSettingsBlock(decorators);
       default: {
         this.error(
-          `Expected class member (var, component, function, event, construction, widget, macro, defaults) but got '${tokenKindName(this.current().kind)}'.`,
+          `Expected class member (var, component, function, event, construction, widget, macro, defaults, settings) but got '${tokenKindName(this.current().kind)}'.`,
           this.current().location, 'BAC1021');
         return undefined;
       }
@@ -458,6 +459,35 @@ class Parser {
       this.match(BacTokenKind.Comma);
     }
     this.expect(BacTokenKind.RBrace, "'}' to close defaults body");
+    return out;
+  }
+
+  // `settings { Property = Expression … }` — UBlueprint metadata block,
+  // the editor's "Class Settings" panel. Body shape is identical to
+  // `defaults` — both lower to FProperty::ImportText through the same
+  // shared assignment parser; the difference is the target (UBlueprint
+  // asset vs. its CDO), which the plugin generator dispatches on.
+  private parseSettingsBlock(decorators: ast.BacDecorator[]): ast.BacSettingsBlock {
+    const out: ast.BacSettingsBlock = {
+      kind: 'settings', location: this.current().location, decorators,
+      assignments: [],
+    };
+    this.advance(); // 'settings'
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open settings body")) { return out; }
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+      const location = this.current().location;
+      const name = this.expectAssignmentName('class setting property name');
+      if (!name) { break; }
+      if (!this.expect(BacTokenKind.Assign, "'=' after class setting property name")) { break; }
+      const value = this.parseExpr();
+      if (!value) { break; }
+      out.assignments.push({ name, value, location });
+      this.skipNewlines();
+      this.match(BacTokenKind.Comma);
+    }
+    this.expect(BacTokenKind.RBrace, "'}' to close settings body");
     return out;
   }
 

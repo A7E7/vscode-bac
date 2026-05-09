@@ -118,6 +118,38 @@ module.exports = grammar({
       $.function_decl,
       $.event_decl,
       $.construction_decl,
+      $.defaults_block,
+      $.settings_block,
+    ),
+
+    // `defaults { Property = Value … }` — class-scope CDO overrides. Each
+    // assignment routes through FProperty::ImportText into the BPGC's class
+    // default object on the engine side.
+    defaults_block: $ => seq(
+      'defaults',
+      '{',
+      repeat($.class_assignment),
+      '}',
+    ),
+
+    // `settings { Property = Value … }` — UBlueprint asset metadata
+    // (the editor's "Class Settings" panel). Body shape is identical to
+    // `defaults`; the plugin dispatches on member kind to pick the
+    // target (UBlueprint vs. CDO).
+    settings_block: $ => seq(
+      'settings',
+      '{',
+      repeat($.class_assignment),
+      '}',
+    ),
+
+    // Property override LHS in defaults / settings blocks. Permits a
+    // dotted path (`PrimaryActorTick.bStartWithTickEnabled`) so the
+    // engine-side resolver can walk into FStructProperty layers.
+    class_assignment: $ => seq(
+      field('name', sep1($.identifier, '.')),
+      '=',
+      field('value', $._expression),
     ),
 
     // ─── Variable / component / function / event / construction ────────────
@@ -427,4 +459,8 @@ module.exports = grammar({
 function commaSep1(rule) {
   // Trailing comma allowed (C++ parser bails out at RParen even after a comma).
   return seq(rule, repeat(seq(',', rule)), optional(','));
+}
+
+function sep1(rule, separator) {
+  return seq(rule, repeat(seq(separator, rule)));
 }

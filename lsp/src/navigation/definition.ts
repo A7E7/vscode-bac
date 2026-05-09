@@ -61,7 +61,7 @@ export function findDefinition(ctx: DefinitionContext): Location | undefined {
 
 export function findClassMember(cls: ast.BacClassDecl, name: string): ast.BacMember | undefined {
   for (const m of cls.members) {
-    if (m.kind === 'construction' || m.kind === 'defaults') { continue; }
+    if (m.kind === 'construction' || m.kind === 'defaults' || m.kind === 'settings') { continue; }
     if (m.name === name) { return m; }
   }
   return undefined;

@@ -79,3 +79,60 @@ class T : Actor {
       (function_decl
         name: (identifier)
         body: (block)))))
+
+==================
+Class with defaults block
+==================
+
+class T : Actor {
+  defaults {
+    bAlwaysRelevant = true
+    PrimaryActorTick.bStartWithTickEnabled = false
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (defaults_block
+        (class_assignment
+          name: (identifier)
+          value: (bool_literal))
+        (class_assignment
+          name: (identifier)
+          name: (identifier)
+          value: (bool_literal))))))
+
+==================
+Class with settings block
+==================
+
+class T : Actor {
+  settings {
+    BlueprintDisplayName = "Cool"
+    bGenerateAbstractClass = true
+    bRunConstructionScriptOnDrag = false
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (settings_block
+        (class_assignment
+          name: (identifier)
+          value: (string_literal))
+        (class_assignment
+          name: (identifier)
+          value: (bool_literal))
+        (class_assignment
+          name: (identifier)
+          value: (bool_literal))))))

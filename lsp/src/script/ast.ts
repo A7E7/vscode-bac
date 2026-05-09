@@ -178,7 +178,7 @@ export interface BacAssignment {
 export type BacMember =
   | BacVariableDecl | BacComponentDecl | BacFunctionDecl
   | BacEventDecl    | BacConstructionDecl | BacWidgetDecl
-  | BacMacroDecl    | BacDefaultsBlock;
+  | BacMacroDecl    | BacDefaultsBlock   | BacSettingsBlock;
 
 interface BacMemberBase {
   location:   BacSourceLocation;
@@ -239,6 +239,20 @@ export interface BacMacroDecl extends BacMemberBase {
  */
 export interface BacDefaultsBlock extends BacMemberBase {
   kind:        'defaults';
+  assignments: BacAssignment[];
+}
+/**
+ * `settings { Property = Expression … }` — UBlueprint metadata block,
+ * the editor's "Class Settings" panel. Same body shape as `defaults`,
+ * but the plugin generator targets the UBlueprint asset (NOT its CDO),
+ * and the transcriber walks UBlueprint UPROPERTYs filtered by
+ * Category=BlueprintOptions/ClassOptions to populate it. New UE Class-
+ * Settings fields auto-round-trip without code changes — the whole
+ * point of using reflection over hand-listed decorators.
+ * Mirrors the C++ FBacSettingsBlock.
+ */
+export interface BacSettingsBlock extends BacMemberBase {
+  kind:        'settings';
   assignments: BacAssignment[];
 }
 

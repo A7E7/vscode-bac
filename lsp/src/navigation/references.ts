@@ -70,7 +70,7 @@ function collectHits(scriptAst: ast.BacScriptAst, text: string, name: string): H
   if (cls.name === name) { addNameHit(text, cls.location.offset, name, 'decl', hits); }
 
   for (const m of cls.members) {
-    const memberName = (m.kind === 'construction' || m.kind === 'defaults') ? undefined : m.name;
+    const memberName = (m.kind === 'construction' || m.kind === 'defaults' || m.kind === 'settings') ? undefined : m.name;
     if (memberName === name) {
       addNameHit(text, m.location.offset, name, 'decl', hits);
     }

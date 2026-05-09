@@ -265,6 +265,10 @@ function formatClassMember(m: ast.BacMember): string {
       const n = m.assignments.length;
       return `\`defaults\` block (${n} CDO override${n === 1 ? '' : 's'})`;
     }
+    case 'settings': {
+      const n = m.assignments.length;
+      return `\`settings\` block (${n} class setting${n === 1 ? '' : 's'})`;
+    }
   }
 }
 

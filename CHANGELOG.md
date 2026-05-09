@@ -12,6 +12,25 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `settings { … }` keyword (lockstep grammar change)
+- New `settings` keyword + `settings_block` rule in `grammar.js`
+  (tree-sitter), `Kw_Settings` token + `parseSettingsBlock` in the LSP TS
+  parser. Mirrors the plugin-side `Kw_Settings` / `FBacSettingsBlock`
+  introduced in BlueprintAsCode this slice — the plugin replaced the
+  seven hand-listed `@blueprint_*` decorators with a reflective
+  `settings { Property = Value }` block parallel to `defaults`,
+  auto-covering every UBlueprint metadata field the editor's "Class
+  Settings" panel surfaces.
+- Tree-sitter corpus: two new fixtures in `test/corpus/classes.txt` —
+  "Class with defaults block" (filling a long-standing grammar gap; the
+  rule existed in the LSP TS port but not in the tree-sitter grammar)
+  and "Class with settings block".
+- LSP TS hover / definition / references / symbols / contract-check all
+  recognise the new member kind. Grammar mirrors confirmed by
+  `npx tree-sitter test` (9/9) and `npm run parity` (14/14).
+- Diagnostic codes / `bac.lint` JSON / completion-server NDJSON
+  unchanged.
+
 ### Added — Class Settings + Class Defaults round-trip (plugin side)
 - New class-level decorators recognised by the plugin generator /
   transcriber pair: `@blueprint_display`, `@blueprint_description`,

@@ -158,6 +158,7 @@ function nameOf(m: ast.BacMember): string | undefined {
   switch (m.kind) {
     case 'construction':
     case 'defaults':
+    case 'settings':
       return undefined;
     default:
       return m.name;
