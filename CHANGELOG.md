@@ -12,6 +12,24 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Class Settings + Class Defaults round-trip (plugin side)
+- New class-level decorators recognised by the plugin generator /
+  transcriber pair: `@blueprint_display`, `@blueprint_description`,
+  `@blueprint_category`, `@blueprint_namespace`, `@blueprint_abstract`,
+  `@blueprint_const`, `@blueprint_deprecated`. Each maps to a UBlueprint
+  metadata field exposed in the editor's "Class Settings" panel.
+- `defaults { PrimaryActorTick.bStartWithTickEnabled = false }` — dot-
+  paths into nested CDO struct fields now round-trip. The grammar
+  already accepted dotted assignment LHSes (the existing widget-slot
+  syntax `Slot.Anchors = …` exercises the same parser path); the new
+  bridge is in the plugin's generator and transcriber.
+- LSP / grammar: **no change required**. The decorator surface stays
+  permissive (`@<name>(<args>)` with arbitrary identifiers), the
+  defaults-block already accepts dotted LHSes, and the `implements`
+  clause was wired through the parser since v0.1. Stable-code list and
+  diagnostic shape are unchanged. Documenting here so the lockstep
+  invariant stays explicit.
+
 ### Added — Document symbols + hover + formatter for `struct` / `asset` / `table` documents
 - LSP passes that previously no-op'd on non-class documents now provide
   meaningful results:
