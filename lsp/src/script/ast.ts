@@ -283,9 +283,28 @@ export interface BacAssetDecl {
   assignments:     BacAssignment[];
 }
 
+export interface BacTableRow {
+  location:    BacSourceLocation;
+  name:        string;
+  assignments: BacAssignment[];
+}
+
+/**
+ * `table Foo : RowStruct { row "Name" { Property = Value … } … }` — UDataTable
+ * asset whose rows are instances of `RowStruct`. Mirrors the C++ FBacTableDecl.
+ */
+export interface BacTableDecl {
+  location:        BacSourceLocation;
+  name:            string;
+  rowStructName:   string;
+  decorators:      BacDecorator[];
+  rows:            BacTableRow[];
+}
+
 export interface BacScriptAst {
   imports: BacImport[];
   class?:  BacClassDecl;
   struct?: BacStructDecl;
   asset?:  BacAssetDecl;
+  table?:  BacTableDecl;
 }

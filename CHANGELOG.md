@@ -12,6 +12,19 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `table Foo : RowStruct { row "Name" { … } }` UDataTable documents (top-level keyword mirror)
+- Top-level parser dispatch on `class` / `struct` / `asset` / `table`
+  (the fourth shipping with this slice). Mirrors BAC plugin commit
+  b71c597. New `Kw_Table` + `Kw_Row` lexer tokens, `BacTableDecl` /
+  `BacTableRow` AST nodes, `parseTableDecl` method.
+- IDE no longer flags `Roundtrip_Table.bac` (and similar table
+  documents) with `BAC1010`. LSP passes already early-return when
+  `ast.class` is missing, so a table-only document no-ops cleanly
+  through every nav / validator pass.
+- Engine side (already shipped): `IBacGenerator::GenerateTable` +
+  `IBacTranscriber::TranscribeTable` + `RunRoundtripTable` helper +
+  fixed-point name-mask extension to cover the `table` header.
+
 ### Added — `asset Foo : ParentClass { … }` UObject instance documents (top-level keyword mirror)
 - Top-level parser dispatch on `class` / `struct` / `asset` (the third
   shipping with this slice). Mirrors BAC plugin commit f2ae7c4.

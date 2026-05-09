@@ -138,8 +138,10 @@ class Parser {
       out.struct = this.parseStructDecl(topDecorators);
     } else if (this.check(BacTokenKind.Kw_Asset)) {
       out.asset = this.parseAssetDecl(topDecorators);
+    } else if (this.check(BacTokenKind.Kw_Table)) {
+      out.table = this.parseTableDecl(topDecorators);
     } else {
-      this.error("Expected 'class', 'struct', or 'asset' declaration after imports/decorators.",
+      this.error("Expected 'class', 'struct', 'asset', or 'table' declaration after imports/decorators.",
         this.current().location, 'BAC1010');
       return out;
     }
@@ -217,6 +219,67 @@ class Parser {
     }
 
     this.expect(BacTokenKind.RBrace, "'}' to close asset body");
+    return out;
+  }
+
+  // `table Foo : RowStruct { row "Name" { ... } }` — UDataTable asset.
+  // Each `row "..."` body is a `Property = Value` list.
+  private parseTableDecl(decorators: ast.BacDecorator[]): ast.BacTableDecl {
+    const out: ast.BacTableDecl = {
+      location: this.current().location, decorators,
+      name: '', rowStructName: '', rows: [],
+    };
+    this.advance(); // 'table'
+    out.name = this.expectIdentifier('table name');
+    if (!this.expect(BacTokenKind.Colon, "':' before table row struct")) { return out; }
+    out.rowStructName = this.expectIdentifier('row struct name');
+    this.skipNewlines();
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open table body")) { return out; }
+
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+
+      if (!this.check(BacTokenKind.Kw_Row)) {
+        this.error(
+          `Expected 'row "..."' inside table body but got '${tokenKindName(this.current().kind)}'.`,
+          this.current().location, 'BAC1023');
+        this.advance();
+        continue;
+      }
+      const rowLocation = this.current().location;
+      this.advance(); // 'row'
+      if (!this.check(BacTokenKind.StringLit)) {
+        this.error("Expected string literal row name after 'row'.",
+          this.current().location, 'BAC1024');
+        continue;
+      }
+      // Strip surrounding quotes from the lexeme.
+      let rowName = this.current().lexeme;
+      if (rowName.length >= 2 && rowName.startsWith('"') && rowName.endsWith('"')) {
+        rowName = rowName.slice(1, -1);
+      }
+      this.advance();
+      if (!this.expect(BacTokenKind.LBrace, "'{' to open row body")) { continue; }
+      const assignments: ast.BacAssignment[] = [];
+      while (true) {
+        this.skipNewlines();
+        if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+        const aLocation = this.current().location;
+        const aName = this.expectAssignmentName('row property name');
+        if (!aName) { break; }
+        if (!this.expect(BacTokenKind.Assign, "'=' after row property name")) { break; }
+        const aValue = this.parseExpr();
+        if (!aValue) { break; }
+        assignments.push({ name: aName, value: aValue, location: aLocation });
+        this.skipNewlines();
+        this.match(BacTokenKind.Comma);
+      }
+      this.expect(BacTokenKind.RBrace, "'}' to close row body");
+      out.rows.push({ location: rowLocation, name: rowName, assignments });
+    }
+
+    this.expect(BacTokenKind.RBrace, "'}' to close table body");
     return out;
   }
 
