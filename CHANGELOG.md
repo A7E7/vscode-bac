@@ -12,6 +12,34 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Fixed — Diagnostic squiggles cover the offending token, not just the first letter
+- The `bac.lint` JSON wire shape carried only a single `{line, column, offset}`
+  per diagnostic, so every red/yellow underline was synthesized at exactly
+  one column wide regardless of what the diagnostic referred to. Fixed in
+  two layers, both in `lsp/src/server.ts`:
+  1. **Word-widening fallback.** When no end position is supplied, the LSP
+     reads the document text and widens the start to the end of the
+     identifier or keyword at that point (`endOfWordAt`). Operator-only
+     points fall through to the prior 1-character range. Applies to both
+     pipelines — engine (`toLspDiagnostic`) and AST
+     (`toLspDiagnosticFromBac`).
+  2. **Engine-supplied end.** `BacDiagnostic_LintWire` now accepts optional
+     `endLine` / `endColumn` / `endOffset` (and the same on `notes[]`). When
+     present they take priority over the fallback. The plugin populates
+     these for parser-emitted diagnostics this slice; validator AST sites
+     follow incrementally. Wire change is fully backward-compatible —
+     older plugin builds keep working via the fallback path.
+
+### Added — `settings`, `defaults`, `macro` highlighted as keywords
+- TextMate grammar (`editors/code/syntaxes/bac.tmLanguage.json`): added
+  `settings` and `defaults` to `keyword.other.bac`; added a `macro Name`
+  rule mirroring `function`/`event` so the macro name picks up
+  `entity.name.function.bac`.
+- Tree-sitter highlight query (`queries/highlights.scm`): added `settings`
+  and `defaults` to the `@keyword` group. (`macro` not yet added — the
+  tree-sitter grammar doesn't define a `macro_decl` rule; that's a
+  follow-up that needs grammar changes + LSP TS parser mirror.)
+
 ### Added — `settings { … }` keyword (lockstep grammar change)
 - New `settings` keyword + `settings_block` rule in `grammar.js`
   (tree-sitter), `Kw_Settings` token + `parseSettingsBlock` in the LSP TS

@@ -21,6 +21,8 @@
   "component"
   "attach"
   "construction"
+  "settings"
+  "defaults"
 ] @keyword
 
 [

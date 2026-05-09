@@ -92,6 +92,13 @@
           }
         },
         {
+          "match": "\\b(macro)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.function.bac" },
+            "2": { "name": "entity.name.function.bac" }
+          }
+        },
+        {
           "match": "\\b(var|let)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "storage.type.bac" },
@@ -100,7 +107,7 @@
         },
         {
           "name": "keyword.other.bac",
-          "match": "\\b(attach|construction)\\b"
+          "match": "\\b(attach|construction|settings|defaults)\\b"
         }
       ]
     },

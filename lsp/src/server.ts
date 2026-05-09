@@ -67,16 +67,31 @@ const DEFAULTS: BacSettings = {
 // are flat strings (line/column) — different from the TS-internal
 // BacDiagnostic which uses a nested BacSourceLocation. Renamed `_LintWire`
 // so the import from script/diagnostics doesn't collide.
+//
+// `endLine` / `endColumn` / `endOffset` are optional: emitters that have a
+// token range supply them so the LSP can render an exact range. When absent,
+// the LSP widens the point to the end of the word at the start position.
 interface BacDiagnostic_LintWire {
-  severity: 'error' | 'warning' | 'info';
-  code:    string;
-  message: string;
-  line:    number;
-  column:  number;
-  offset:  number;
-  notes?:  Array<{ message: string; line: number; column: number; offset: number }>;
-  hint?:   string;
-  fixes?:  string[];
+  severity:   'error' | 'warning' | 'info';
+  code:       string;
+  message:    string;
+  line:       number;
+  column:     number;
+  offset:     number;
+  endLine?:   number;
+  endColumn?: number;
+  endOffset?: number;
+  notes?:     Array<{
+    message:    string;
+    line:       number;
+    column:     number;
+    offset:     number;
+    endLine?:   number;
+    endColumn?: number;
+    endOffset?: number;
+  }>;
+  hint?:      string;
+  fixes?:     string[];
 }
 
 interface BacLintResult {
@@ -474,7 +489,7 @@ function runAstPasses(
   runContractCheck(ast, diags);
   runReferenceCheck(ast, diags);
   runTypeCheck(ast, diags);
-  state.astDiagnostics = diags.items.map(toLspDiagnosticFromBac);
+  state.astDiagnostics = diags.items.map((d) => toLspDiagnosticFromBac(d, doc));
 }
 
 function publish(
@@ -647,17 +662,49 @@ async function runEngineLint(
       publish(connection, doc.uri, state);
       return;
     }
-    state.engineDiagnostics = (result.diagnostics ?? []).map(toLspDiagnostic);
+    state.engineDiagnostics = (result.diagnostics ?? []).map((d) => toLspDiagnostic(d, doc));
     publish(connection, doc.uri, state);
   })().finally(() => { state.engineInflight = undefined; });
   await state.engineInflight;
 }
 
+// Widen a point (0-based line/character) to the end of the identifier or
+// keyword starting there, so the diagnostic squiggle covers the offending
+// token instead of just its first letter. Returns the end character on the
+// same line. If the point doesn't sit on a word character, falls back to
+// `character + 1` so something is still visible.
+function endOfWordAt(doc: TextDocument | undefined, line: number, character: number): number {
+  if (!doc) { return character + 1; }
+  const startOffset = doc.offsetAt({ line, character });
+  const text = doc.getText();
+  // Word = ASCII identifier (letters/digits/underscore). Engine and validator
+  // diagnostics point at identifiers, keywords, or operator tokens; for
+  // operators this falls through to the +1 fallback, which still beats
+  // first-letter-only.
+  let end = startOffset;
+  while (end < text.length) {
+    const c = text.charCodeAt(end);
+    const isWord =
+      (c >= 0x30 && c <= 0x39) ||  // 0-9
+      (c >= 0x41 && c <= 0x5A) ||  // A-Z
+      (c >= 0x61 && c <= 0x7A) ||  // a-z
+      c === 0x5F;                  // _
+    if (!isWord) { break; }
+    end++;
+  }
+  if (end === startOffset) { return character + 1; }
+  const endPos = doc.positionAt(end);
+  // Word ranges are single-line by construction; if the offset crosses a
+  // newline (shouldn't happen for identifiers), clamp to the original line.
+  return endPos.line === line ? endPos.character : character + 1;
+}
+
 // AST-pass diagnostics arrive in the TS-internal `BacDiagnostic` shape; convert
-// to LSP using the same point→1-char-range trick as the engine path.
-function toLspDiagnosticFromBac(d: BacDiagnostic): Diagnostic {
+// to LSP, widening the point to the end of the word at that point.
+function toLspDiagnosticFromBac(d: BacDiagnostic, doc?: TextDocument): Diagnostic {
   const startLine = Math.max(0, d.location.line - 1);
   const startCol  = Math.max(0, d.location.column - 1);
+  const endCol    = endOfWordAt(doc, startLine, startCol);
   const sev =
     d.severity === 'error'   ? DiagnosticSeverity.Error :
     d.severity === 'warning' ? DiagnosticSeverity.Warning :
@@ -665,22 +712,26 @@ function toLspDiagnosticFromBac(d: BacDiagnostic): Diagnostic {
   const tail = [d.hint, ...(d.fixes ?? []).map((f) => `fix: ${f}`)].filter(Boolean).join('\n');
   const related: DiagnosticRelatedInformation[] | undefined =
     d.notes?.length
-      ? d.notes.map((n) => ({
-          location: {
-            uri: '',
-            range: {
-              start: { line: Math.max(0, n.location.line - 1), character: Math.max(0, n.location.column - 1) },
-              end:   { line: Math.max(0, n.location.line - 1), character: Math.max(0, n.location.column - 1) + 1 },
+      ? d.notes.map((n) => {
+          const nLine = Math.max(0, n.location.line - 1);
+          const nCol  = Math.max(0, n.location.column - 1);
+          return {
+            location: {
+              uri: '',
+              range: {
+                start: { line: nLine, character: nCol },
+                end:   { line: nLine, character: endOfWordAt(doc, nLine, nCol) },
+              },
             },
-          },
-          message: n.message,
-        }))
+            message: n.message,
+          };
+        })
       : undefined;
   return {
     severity: sev,
     range:    {
       start: { line: startLine, character: startCol },
-      end:   { line: startLine, character: startCol + 1 },
+      end:   { line: startLine, character: endCol },
     },
     code:     d.code,
     message:  tail ? `${d.message}\n${tail}` : d.message,
@@ -692,15 +743,19 @@ function toLspDiagnosticFromBac(d: BacDiagnostic): Diagnostic {
   };
 }
 
-function toLspDiagnostic(d: BacDiagnostic_LintWire): Diagnostic {
+function toLspDiagnostic(d: BacDiagnostic_LintWire, doc?: TextDocument): Diagnostic {
   // BAC locations are 1-based; LSP positions are 0-based.
-  // The validator gives us a single point; synthesize a 1-char range so the
-  // squiggle is visible.
+  // Prefer the engine-supplied end position when present; otherwise widen
+  // the start point to the end of the word at that point so the squiggle
+  // covers the offending token instead of just its first letter.
   const startLine = Math.max(0, d.line - 1);
   const startCol  = Math.max(0, d.column - 1);
+  const endLine   = d.endLine   !== undefined ? Math.max(startLine, d.endLine - 1)   : startLine;
+  const endCol    = d.endColumn !== undefined ? Math.max(0, d.endColumn - 1)
+                                              : endOfWordAt(doc, startLine, startCol);
   const range = {
     start: { line: startLine, character: startCol },
-    end:   { line: startLine, character: startCol + 1 },
+    end:   { line: endLine,   character: endCol  },
   };
   const sev =
     d.severity === 'error'   ? DiagnosticSeverity.Error :
@@ -708,16 +763,23 @@ function toLspDiagnostic(d: BacDiagnostic_LintWire): Diagnostic {
                                DiagnosticSeverity.Information;
   const related: DiagnosticRelatedInformation[] | undefined =
     d.notes?.length
-      ? d.notes.map((n) => ({
-          location: {
-            uri: '',
-            range: {
-              start: { line: Math.max(0, n.line - 1), character: Math.max(0, n.column - 1) },
-              end:   { line: Math.max(0, n.line - 1), character: Math.max(0, n.column - 1) + 1 },
+      ? d.notes.map((n) => {
+          const nLine = Math.max(0, n.line - 1);
+          const nCol  = Math.max(0, n.column - 1);
+          const nEndL = n.endLine   !== undefined ? Math.max(nLine, n.endLine - 1)   : nLine;
+          const nEndC = n.endColumn !== undefined ? Math.max(0, n.endColumn - 1)
+                                                  : endOfWordAt(doc, nLine, nCol);
+          return {
+            location: {
+              uri: '',
+              range: {
+                start: { line: nLine, character: nCol  },
+                end:   { line: nEndL, character: nEndC },
+              },
             },
-          },
-          message: n.message,
-        }))
+            message: n.message,
+          };
+        })
       : undefined;
   const tail = [d.hint, ...(d.fixes ?? []).map((f) => `fix: ${f}`)].filter(Boolean).join('\n');
   return {

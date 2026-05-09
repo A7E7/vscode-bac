@@ -55,6 +55,16 @@ Engine pass diagnostics override AST pass diagnostics on the same
 `(code, line, column)` — same hit reported by both pipelines means the engine
 already confirmed it; we don't double-publish.
 
+**Diagnostic ranges.** The wire shape (`BacDiagnostic_LintWire`) carries the
+start as `{line, column, offset}` plus an optional end as
+`{endLine, endColumn, endOffset}`. When the engine supplies an end (parser
+sites do, validator AST sites are being plumbed incrementally) the LSP
+emits the exact range. When absent, the LSP widens the start point to the
+end of the identifier/keyword at that offset by reading the document text;
+operator-only points fall through to a 1-character range. This keeps red
+squiggles on the offending token instead of just its first letter without
+forcing every emission site to know its end.
+
 ### Completion (engine-augmented)
 
 ```
