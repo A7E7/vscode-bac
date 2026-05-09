@@ -12,6 +12,23 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Document symbols + hover + formatter for `struct` / `asset` / `table` documents
+- LSP passes that previously no-op'd on non-class documents now provide
+  meaningful results:
+  - **Document symbols** (Outline view + breadcrumbs): struct → fields,
+    asset → property assignments, table → rows → property assignments.
+    Each level has the right `SymbolKind` (Struct / Field / Object /
+    Property) so the IDE icons match.
+  - **Hover**: hovering over a struct field name shows
+    `var X: Type`. Hovering over an asset property name shows
+    `property X on ParentClass`. Hovering over a table row name shows
+    `row "X" (N property overrides)`; hovering over a property inside
+    a row body shows `property X on row "Y"`.
+  - **Formatter**: `printBacRoot` now routes to `printStruct` /
+    `printAsset` / `printTable` when no `class` is present — non-class
+    documents were getting their body silently dropped on format.
+- LSP build clean, parity tests still 13/13 passing.
+
 ### Added — `table Foo : RowStruct { row "Name" { … } }` UDataTable documents (top-level keyword mirror)
 - Top-level parser dispatch on `class` / `struct` / `asset` / `table`
   (the fourth shipping with this slice). Mirrors BAC plugin commit

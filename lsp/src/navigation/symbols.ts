@@ -11,9 +11,14 @@ import * as ast from '../script/ast';
 import { rangeFromSpan } from './text-utils';
 
 export function buildDocumentSymbols(scriptAst: ast.BacScriptAst, text: string): DocumentSymbol[] {
-  if (!scriptAst.class) { return []; }
-  const cls = scriptAst.class;
+  if (scriptAst.class)  { return [classSymbol(scriptAst.class, text)]; }
+  if (scriptAst.struct) { return [structSymbol(scriptAst.struct, text)]; }
+  if (scriptAst.asset)  { return [assetSymbol(scriptAst.asset, text)]; }
+  if (scriptAst.table)  { return [tableSymbol(scriptAst.table, text)]; }
+  return [];
+}
 
+function classSymbol(cls: ast.BacClassDecl, text: string): DocumentSymbol {
   const memberSymbols: DocumentSymbol[] = [];
   for (let i = 0; i < cls.members.length; i++) {
     const m = cls.members[i];
@@ -23,20 +28,91 @@ export function buildDocumentSymbols(scriptAst: ast.BacScriptAst, text: string):
     const sym   = symbolForMember(m, range, sel);
     if (sym) { memberSymbols.push(sym); }
   }
-
-  // The class itself spans from its `class` keyword to end-of-file.
   const classStart = cls.location.offset;
-  const classRange = lspRange(rangeFromSpan(text, classStart, text.length));
-  const classSel   = lspRange(rangeFromSpan(text, classStart, classStart + cls.name.length + /*"class "*/ 6));
-
-  return [{
+  return {
     name:           cls.name,
     detail:         cls.parentTypeName ? `: ${cls.parentTypeName}` : undefined,
     kind:           SymbolKind.Class,
-    range:          classRange,
-    selectionRange: classSel,
+    range:          lspRange(rangeFromSpan(text, classStart, text.length)),
+    selectionRange: lspRange(rangeFromSpan(text, classStart, classStart + cls.name.length + 6)),
     children:       memberSymbols,
-  }];
+  };
+}
+
+function structSymbol(s: ast.BacStructDecl, text: string): DocumentSymbol {
+  const fields: DocumentSymbol[] = s.fields.map(f => {
+    const start = f.location.offset;
+    const end   = start + 1; // No end-loc available; estimate is good enough for outline.
+    return {
+      name:           f.name,
+      detail:         `: ${formatType(f.type)}`,
+      kind:           SymbolKind.Field,
+      range:          lspRange(rangeFromSpan(text, start, end)),
+      selectionRange: lspRange(rangeFromSpan(text, start, end)),
+    };
+  });
+  const start = s.location.offset;
+  return {
+    name:           s.name,
+    detail:         '(struct)',
+    kind:           SymbolKind.Struct,
+    range:          lspRange(rangeFromSpan(text, start, text.length)),
+    selectionRange: lspRange(rangeFromSpan(text, start, start + s.name.length + /*"struct "*/ 7)),
+    children:       fields,
+  };
+}
+
+function assetSymbol(a: ast.BacAssetDecl, text: string): DocumentSymbol {
+  const props: DocumentSymbol[] = a.assignments.map(asn => {
+    const start = asn.location.offset;
+    return {
+      name:           asn.name,
+      kind:           SymbolKind.Property,
+      range:          lspRange(rangeFromSpan(text, start, start + asn.name.length)),
+      selectionRange: lspRange(rangeFromSpan(text, start, start + asn.name.length)),
+    };
+  });
+  const start = a.location.offset;
+  return {
+    name:           a.name,
+    detail:         a.parentTypeName ? `: ${a.parentTypeName}` : '(asset)',
+    kind:           SymbolKind.Object,
+    range:          lspRange(rangeFromSpan(text, start, text.length)),
+    selectionRange: lspRange(rangeFromSpan(text, start, start + a.name.length + /*"asset "*/ 6)),
+    children:       props,
+  };
+}
+
+function tableSymbol(t: ast.BacTableDecl, text: string): DocumentSymbol {
+  const rows: DocumentSymbol[] = t.rows.map(r => {
+    const start = r.location.offset;
+    const propSyms: DocumentSymbol[] = r.assignments.map(asn => {
+      const ps = asn.location.offset;
+      return {
+        name:           asn.name,
+        kind:           SymbolKind.Property,
+        range:          lspRange(rangeFromSpan(text, ps, ps + asn.name.length)),
+        selectionRange: lspRange(rangeFromSpan(text, ps, ps + asn.name.length)),
+      };
+    });
+    return {
+      name:           r.name,
+      detail:         '(row)',
+      kind:           SymbolKind.Object,
+      range:          lspRange(rangeFromSpan(text, start, start + r.name.length + /*"row \"\""*/ 7)),
+      selectionRange: lspRange(rangeFromSpan(text, start, start + r.name.length + 7)),
+      children:       propSyms,
+    };
+  });
+  const start = t.location.offset;
+  return {
+    name:           t.name,
+    detail:         t.rowStructName ? `: ${t.rowStructName}` : '(table)',
+    kind:           SymbolKind.Object,
+    range:          lspRange(rangeFromSpan(text, start, text.length)),
+    selectionRange: lspRange(rangeFromSpan(text, start, start + t.name.length + /*"table "*/ 6)),
+    children:       rows,
+  };
 }
 
 function memberRange(m: ast.BacMember, next: ast.BacMember | undefined, text: string): Range {

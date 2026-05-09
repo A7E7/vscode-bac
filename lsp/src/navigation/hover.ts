@@ -29,13 +29,45 @@ export async function buildHover(ctx: HoverContext): Promise<Hover | undefined> 
   const ident = findQualifiedIdentAt(ctx.text, ctx.offset);
   if (!ident) { return undefined; }
   const cls = ctx.ast.class;
-  if (!cls) { return undefined; }
 
   const range = rangeFromSpan(ctx.text, ident.start, ident.end);
   const lspRange = {
     start: { line: range.startLine, character: range.startColumn },
     end:   { line: range.endLine,   character: range.endColumn   },
   };
+
+  // ── struct / asset / table documents — unqualified field / property /
+  //    row lookups against the parsed AST. No engine proxy round-trip;
+  //    these don't have an inherited member surface yet.
+  if (!cls) {
+    if (ctx.ast.struct) {
+      const field = ctx.ast.struct.fields.find(f => f.name === ident.name);
+      if (field) {
+        return md(`\`var\` **${field.name}**: \`${formatType(field.type)}\``, lspRange);
+      }
+    }
+    if (ctx.ast.asset) {
+      const asn = ctx.ast.asset.assignments.find(a => a.name === ident.name);
+      if (asn) {
+        return md(`\`property\` **${asn.name}** on \`${ctx.ast.asset.parentTypeName || '?'}\``, lspRange);
+      }
+    }
+    if (ctx.ast.table) {
+      const row = ctx.ast.table.rows.find(r => r.name === ident.name);
+      if (row) {
+        const n = row.assignments.length;
+        return md(`\`row\` **"${row.name}"** (${n} property override${n === 1 ? '' : 's'})`, lspRange);
+      }
+      // Property name inside a row body.
+      for (const r of ctx.ast.table.rows) {
+        const asn = r.assignments.find(a => a.name === ident.name);
+        if (asn) {
+          return md(`\`property\` **${asn.name}** on row \`"${r.name}"\``, lspRange);
+        }
+      }
+    }
+    return undefined;
+  }
 
   // ── Qualified: receiver.name ──────────────────────────────────────────
   if (ident.receiver) {

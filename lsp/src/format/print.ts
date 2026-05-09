@@ -45,10 +45,24 @@ export function printBacRoot(root: BacFormatRoot): Doc {
     parts.push(hardline);
   }
 
-  // Class.
+  // Top-level decl — class / struct / asset / table. Exactly one is
+  // populated by the parser; we route to the matching printer so non-
+  // class documents don't get their body dropped.
   if (root.ast.class) {
     parts.push(...cursor.flushBefore(root.ast.class.location.offset));
     parts.push(printClass(root.ast.class, cursor));
+    parts.push(hardline);
+  } else if (root.ast.struct) {
+    parts.push(...cursor.flushBefore(root.ast.struct.location.offset));
+    parts.push(printStruct(root.ast.struct));
+    parts.push(hardline);
+  } else if (root.ast.asset) {
+    parts.push(...cursor.flushBefore(root.ast.asset.location.offset));
+    parts.push(printAsset(root.ast.asset));
+    parts.push(hardline);
+  } else if (root.ast.table) {
+    parts.push(...cursor.flushBefore(root.ast.table.location.offset));
+    parts.push(printTable(root.ast.table));
     parts.push(hardline);
   }
 
@@ -112,6 +126,64 @@ function printClass(cls: ast.BacClassDecl, cursor: CommentCursor): Doc {
     }
   }
   parts.push(indent([hardline, ...memberParts]));
+  parts.push('}');
+  return parts;
+}
+
+// ─── Struct / Asset / Table ─────────────────────────────────────────────
+
+function printStruct(s: ast.BacStructDecl): Doc {
+  const parts: Doc[] = [];
+  for (const d of s.decorators) { parts.push(printDecorator(d), hardline); }
+  parts.push('struct ', s.name, ' {');
+  if (s.fields.length === 0) { parts.push('}'); return parts; }
+  const body: Doc[] = [];
+  for (let i = 0; i < s.fields.length; i++) {
+    body.push(printVariable(s.fields[i]));
+    body.push(i === s.fields.length - 1 ? hardline : hardline);
+  }
+  parts.push(indent([hardline, ...body]));
+  parts.push('}');
+  return parts;
+}
+
+function printAsset(a: ast.BacAssetDecl): Doc {
+  const parts: Doc[] = [];
+  for (const d of a.decorators) { parts.push(printDecorator(d), hardline); }
+  parts.push('asset ', a.name, ' : ', a.parentTypeName, ' {');
+  if (a.assignments.length === 0) { parts.push('}'); return parts; }
+  const body: Doc[] = [];
+  for (let i = 0; i < a.assignments.length; i++) {
+    const asn = a.assignments[i];
+    body.push(asn.name, ' = ', printExpr(asn.value), hardline);
+  }
+  parts.push(indent([hardline, ...body]));
+  parts.push('}');
+  return parts;
+}
+
+function printTable(t: ast.BacTableDecl): Doc {
+  const parts: Doc[] = [];
+  for (const d of t.decorators) { parts.push(printDecorator(d), hardline); }
+  parts.push('table ', t.name, ' : ', t.rowStructName, ' {');
+  if (t.rows.length === 0) { parts.push('}'); return parts; }
+  const body: Doc[] = [];
+  for (let i = 0; i < t.rows.length; i++) {
+    const r = t.rows[i];
+    body.push('row "', r.name, '" {');
+    if (r.assignments.length > 0) {
+      const inner: Doc[] = [];
+      for (const asn of r.assignments) {
+        inner.push(asn.name, ' = ', printExpr(asn.value), hardline);
+      }
+      body.push(indent([hardline, ...inner]), '}');
+    } else {
+      body.push('}');
+    }
+    if (i < t.rows.length - 1) { body.push(hardline, hardline); }
+    else { body.push(hardline); }
+  }
+  parts.push(indent([hardline, ...body]));
   parts.push('}');
   return parts;
 }
