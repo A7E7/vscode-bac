@@ -66,15 +66,62 @@ function collectHits(scriptAst: ast.BacScriptAst, text: string, name: string): H
   //    scan forward in the source from the member's location for the name —
   //    same heuristic used by other navigation providers.
   const cls = scriptAst.class;
-  if (!cls) { return hits; }
-  if (cls.name === name) { addNameHit(text, cls.location.offset, name, 'decl', hits); }
+  if (cls) {
+    if (cls.name === name) { addNameHit(text, cls.location.offset, name, 'decl', hits); }
 
-  for (const m of cls.members) {
-    const memberName = (m.kind === 'construction' || m.kind === 'defaults' || m.kind === 'settings') ? undefined : m.name;
-    if (memberName === name) {
-      addNameHit(text, m.location.offset, name, 'decl', hits);
+    for (const m of cls.members) {
+      const memberName = (m.kind === 'construction' || m.kind === 'defaults' || m.kind === 'settings') ? undefined : m.name;
+      if (memberName === name) {
+        addNameHit(text, m.location.offset, name, 'decl', hits);
+      }
+      visitMember(m, name, text, hits);
     }
-    visitMember(m, name, text, hits);
+  }
+
+  // 2. Struct fields — name on the field decl is `decl`; field types pull in
+  //    type-ref hits the same way variable types do for class members.
+  if (scriptAst.struct) {
+    if (scriptAst.struct.name === name) {
+      addNameHit(text, scriptAst.struct.location.offset, name, 'decl', hits);
+    }
+    for (const f of scriptAst.struct.fields) {
+      if (f.name === name) { addNameHit(text, f.location.offset, name, 'decl', hits); }
+      visitTypeRef(f.type, name, hits);
+      if (f.initializer) { visitExpr(f.initializer, name, false, hits); }
+    }
+  }
+
+  // 3. Asset body — every assignment LHS is a `write`; RHS is walked for
+  //    name-bearing exprs.
+  if (scriptAst.asset) {
+    if (scriptAst.asset.name === name) {
+      addNameHit(text, scriptAst.asset.location.offset, name, 'decl', hits);
+    }
+    if (scriptAst.asset.parentTypeName === name) {
+      addNameHit(text, scriptAst.asset.location.offset, name, 'read', hits);
+    }
+    for (const a of scriptAst.asset.assignments) {
+      if (a.name === name) { addNameHit(text, a.location.offset, name, 'write', hits); }
+      visitExpr(a.value, name, false, hits);
+    }
+  }
+
+  // 4. Table — table name decl + per-row name decls + per-row assignment
+  //    LHS as writes.
+  if (scriptAst.table) {
+    if (scriptAst.table.name === name) {
+      addNameHit(text, scriptAst.table.location.offset, name, 'decl', hits);
+    }
+    if (scriptAst.table.rowStructName === name) {
+      addNameHit(text, scriptAst.table.location.offset, name, 'read', hits);
+    }
+    for (const r of scriptAst.table.rows) {
+      if (r.name === name) { addNameHit(text, r.location.offset, name, 'decl', hits); }
+      for (const a of r.assignments) {
+        if (a.name === name) { addNameHit(text, a.location.offset, name, 'write', hits); }
+        visitExpr(a.value, name, false, hits);
+      }
+    }
   }
 
   // Filter and dedupe by exact span (overlapping walks can revisit the same

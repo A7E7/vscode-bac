@@ -12,6 +12,34 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Asset / table body completion routes through the engine proxy (gap 7.1)
+- `findScopeAt` carries two new optional fields: `assetContext.parentTypeName`
+  and `rowContext.rowStructName`. When the cursor sits inside an
+  `asset Foo : ParentClass { … }` body, `buildCompletionItemsAsync` calls
+  `proxy.completeType(parentClass)` and surfaces the editable property
+  surface (UFunctions are dropped in this position — they're not
+  assignable). When inside a `row "Name" { … }` body of a `table … :
+  RowStruct`, it calls `proxy.completeStruct(rowStruct)` and surfaces
+  the row's fields. Both pipelines reuse the existing NDJSON ops and
+  `BacEditorEndpoint.json` discovery — no wire change.
+- `enginePropertiesToItems` and `engineStructFieldsToItems` are the new
+  field-only converters; the existing `engineMembersToItems` (which
+  emits both functions and properties) keeps serving member-access
+  completion. No prefix gating in asset / row contexts since each body
+  is a small finite list — the empty-prefix "show me everything" query
+  is the common case there.
+
+### Added — Definition / references cover struct, asset, and table top-level decls (gap 7.2)
+- `findDefinition` no longer early-returns when `ast.class` is missing.
+  It now falls through to `ast.struct` (jump to a field), `ast.asset`
+  (jump to an assignment LHS), and `ast.table` (jump to a row name or a
+  per-row assignment LHS). F12 inside a struct / asset / table file
+  finally lands somewhere instead of returning null.
+- `collectHits` walks struct fields, asset assignments, and table rows +
+  their assignments so Find References / Document Highlights surface in
+  those files too. Asset's `parentTypeName` and table's `rowStructName`
+  count as `read` hits on the header.
+
 ### Fixed — Diagnostic squiggles cover the offending token, not just the first letter
 - The `bac.lint` JSON wire shape carried only a single `{line, column, offset}`
   per diagnostic, so every red/yellow underline was synthesized at exactly

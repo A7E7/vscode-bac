@@ -29,30 +29,54 @@ export function findDefinition(ctx: DefinitionContext): Location | undefined {
   if (!ident) { return undefined; }
 
   const cls = ctx.ast.class;
-  if (!cls) { return undefined; }
+  if (cls) {
+    const containingMember = findContainingMember(cls, ctx.offset);
 
-  const containingMember = findContainingMember(cls, ctx.offset);
+    // Qualified — only handle this/super/className → class member.
+    if (ident.receiver) {
+      const receiverIsSelf =
+        ident.receiver === 'this' || ident.receiver === 'super' ||
+        ident.receiver === cls.name;
+      if (!receiverIsSelf) { return undefined; }
+      const member = findClassMember(cls, ident.name);
+      if (!member) { return undefined; }
+      return locationOfDecl(ctx, member.location, ident.name);
+    }
 
-  // Qualified — only handle this/super/className → class member.
-  if (ident.receiver) {
-    const receiverIsSelf =
-      ident.receiver === 'this' || ident.receiver === 'super' ||
-      ident.receiver === cls.name;
-    if (!receiverIsSelf) { return undefined; }
+    // Unqualified resolution — walk innermost scope outward.
+    if (containingMember) {
+      const local = findLocalBefore(containingMember, ident.name, ctx.offset);
+      if (local) { return locationOfDecl(ctx, local, ident.name); }
+      const param = findParam(containingMember, ident.name);
+      if (param) { return locationOfDecl(ctx, param, ident.name); }
+    }
     const member = findClassMember(cls, ident.name);
-    if (!member) { return undefined; }
-    return locationOfDecl(ctx, member.location, ident.name);
+    if (member) { return locationOfDecl(ctx, member.location, ident.name); }
+    return undefined;
   }
 
-  // Unqualified resolution — walk innermost scope outward.
-  if (containingMember) {
-    const local = findLocalBefore(containingMember, ident.name, ctx.offset);
-    if (local) { return locationOfDecl(ctx, local, ident.name); }
-    const param = findParam(containingMember, ident.name);
-    if (param) { return locationOfDecl(ctx, param, ident.name); }
+  // No `class` — file may host a struct / asset / table top-level decl.
+  // Self-jump within the decl is what unblocks F12 in those files.
+  if (ident.receiver) { return undefined; }
+
+  if (ctx.ast.struct) {
+    for (const f of ctx.ast.struct.fields) {
+      if (f.name === ident.name) { return locationOfDecl(ctx, f.location, ident.name); }
+    }
   }
-  const member = findClassMember(cls, ident.name);
-  if (member) { return locationOfDecl(ctx, member.location, ident.name); }
+  if (ctx.ast.asset) {
+    for (const a of ctx.ast.asset.assignments) {
+      if (a.name === ident.name) { return locationOfDecl(ctx, a.location, ident.name); }
+    }
+  }
+  if (ctx.ast.table) {
+    for (const r of ctx.ast.table.rows) {
+      if (r.name === ident.name) { return locationOfDecl(ctx, r.location, ident.name); }
+      for (const a of r.assignments) {
+        if (a.name === ident.name) { return locationOfDecl(ctx, a.location, ident.name); }
+      }
+    }
+  }
 
   return undefined;
 }
