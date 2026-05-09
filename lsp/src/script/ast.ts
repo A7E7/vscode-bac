@@ -258,7 +258,19 @@ export interface BacClassDecl {
   members:                BacMember[];
 }
 
+/**
+ * `struct Foo { var Field: Type … }` — UUserDefinedStruct asset. Mirrors the
+ * C++ FBacStructDecl. Body is a flat list of variable declarations only.
+ */
+export interface BacStructDecl {
+  location:    BacSourceLocation;
+  name:        string;
+  decorators:  BacDecorator[];
+  fields:      BacVariableDecl[];
+}
+
 export interface BacScriptAst {
   imports: BacImport[];
   class?:  BacClassDecl;
+  struct?: BacStructDecl;
 }

@@ -12,6 +12,25 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `struct Foo { … }` UUserDefinedStruct documents (top-level keyword mirror)
+- New `Kw_Struct` token + `BacStructDecl` AST node + parser dispatch on
+  `class` vs `struct` at the top level. Mirrors BAC plugin commit
+  35bd35c. Struct bodies hold `var` field declarations only — same
+  shape BP class variables use, no functions / events / components /
+  macros / defaults.
+- `BacScriptAst` grew a `struct?` slot alongside `class?`. LSP passes
+  (navigation, hover, references, symbols, completion, contract-check,
+  type-check, reference-check, formatter) all already early-return when
+  `ast.class` is missing, so a struct-only document no-ops cleanly
+  through every pass. Hover / nav / completion polish for struct fields
+  is a follow-up.
+- IDE no longer flags `Roundtrip_Struct.bac` (and similar struct
+  documents) with `BAC1010` ("Expected 'class' declaration").
+- Engine side (already shipped): generator routes each `var` field
+  through `FStructureEditorUtils::AddVariable` + `RenameVariable` +
+  `ChangeVariableDefaultValue`; transcriber walks `GetVarDesc` and emits
+  one `var` line per field with the type + literal default.
+
 ### Added — `defaults { … }` class-scope CDO overrides (member-keyword mirror)
 - New `Kw_Defaults` token + `BacDefaultsBlock` AST + `parseDefaultsBlock`
   mirroring the C++ parser. Body shape: `Property = Expression` per

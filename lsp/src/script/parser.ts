@@ -129,22 +129,59 @@ class Parser {
       this.skipNewlines();
     }
 
-    const classDecorators = this.parseDecorators();
+    const topDecorators = this.parseDecorators();
     this.skipNewlines();
 
-    if (!this.check(BacTokenKind.Kw_Class)) {
-      this.error("Expected 'class' declaration after imports/decorators.",
+    if (this.check(BacTokenKind.Kw_Class)) {
+      out.class = this.parseClassDecl(topDecorators);
+    } else if (this.check(BacTokenKind.Kw_Struct)) {
+      out.struct = this.parseStructDecl(topDecorators);
+    } else {
+      this.error("Expected 'class' or 'struct' declaration after imports/decorators.",
         this.current().location, 'BAC1010');
       return out;
     }
-
-    out.class = this.parseClassDecl(classDecorators);
     this.skipNewlines();
 
     if (!this.isAtEnd()) {
-      this.error('Unexpected tokens after end of class. Only one class declaration per .bac file is supported.',
+      this.error('Unexpected tokens after end of top-level declaration. Only one top-level decl per .bac file is supported.',
         this.current().location, 'BAC1011');
     }
+    return out;
+  }
+
+  // `struct Foo { var Field: Type [= default] … }` — UUserDefinedStruct asset.
+  // Body holds `var` field declarations only; per-field decorators (the same
+  // `@display(...)` shape BP variables use) are accepted.
+  private parseStructDecl(decorators: ast.BacDecorator[]): ast.BacStructDecl {
+    const out: ast.BacStructDecl = {
+      location: this.current().location, decorators, name: '', fields: [],
+    };
+    this.advance(); // 'struct'
+    out.name = this.expectIdentifier('struct name');
+    this.skipNewlines();
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open struct body")) { return out; }
+
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+
+      const fieldDecorators = this.parseDecorators();
+      this.skipNewlines();
+
+      if (this.check(BacTokenKind.Kw_Var)) {
+        const field = this.parseVariableDecl(fieldDecorators);
+        out.fields.push(field);
+      } else {
+        this.error(
+          `Expected 'var' field declaration in struct body but got '${tokenKindName(this.current().kind)}'.`,
+          this.current().location, 'BAC1022');
+        // Skip to the next sync point so a single bad field doesn't tank the parse.
+        this.advance();
+      }
+    }
+
+    this.expect(BacTokenKind.RBrace, "'}' to close struct body");
     return out;
   }
 

@@ -35,6 +35,7 @@ export enum BacTokenKind {
   Kw_Widget,
   Kw_Macro,
   Kw_Defaults,
+  Kw_Struct,
 
   // Keywords — control flow
   Kw_If,
@@ -124,6 +125,7 @@ const KW_NAMES: Record<string, BacTokenKind> = {
   widget:       BacTokenKind.Kw_Widget,
   macro:        BacTokenKind.Kw_Macro,
   defaults:     BacTokenKind.Kw_Defaults,
+  struct:       BacTokenKind.Kw_Struct,
   if:           BacTokenKind.Kw_If,
   else:         BacTokenKind.Kw_Else,
   for:          BacTokenKind.Kw_For,
