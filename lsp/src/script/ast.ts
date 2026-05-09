@@ -269,8 +269,23 @@ export interface BacStructDecl {
   fields:      BacVariableDecl[];
 }
 
+/**
+ * `asset Foo : ParentClass { Property = Value … }` — single UObject instance
+ * (data assets, physical materials, sound classes, …). Mirrors the C++
+ * FBacAssetDecl. Body is the same `Property = Value` shape the class-scope
+ * `defaults { ... }` block uses.
+ */
+export interface BacAssetDecl {
+  location:        BacSourceLocation;
+  name:            string;
+  parentTypeName:  string;
+  decorators:      BacDecorator[];
+  assignments:     BacAssignment[];
+}
+
 export interface BacScriptAst {
   imports: BacImport[];
   class?:  BacClassDecl;
   struct?: BacStructDecl;
+  asset?:  BacAssetDecl;
 }

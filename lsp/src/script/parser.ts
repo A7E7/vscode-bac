@@ -136,8 +136,10 @@ class Parser {
       out.class = this.parseClassDecl(topDecorators);
     } else if (this.check(BacTokenKind.Kw_Struct)) {
       out.struct = this.parseStructDecl(topDecorators);
+    } else if (this.check(BacTokenKind.Kw_Asset)) {
+      out.asset = this.parseAssetDecl(topDecorators);
     } else {
-      this.error("Expected 'class' or 'struct' declaration after imports/decorators.",
+      this.error("Expected 'class', 'struct', or 'asset' declaration after imports/decorators.",
         this.current().location, 'BAC1010');
       return out;
     }
@@ -182,6 +184,39 @@ class Parser {
     }
 
     this.expect(BacTokenKind.RBrace, "'}' to close struct body");
+    return out;
+  }
+
+  // `asset Foo : ParentClass { Property = Value … }` — UObject instance
+  // (data assets, physical materials, …). Body shape matches the
+  // class-scope `defaults { ... }` block.
+  private parseAssetDecl(decorators: ast.BacDecorator[]): ast.BacAssetDecl {
+    const out: ast.BacAssetDecl = {
+      location: this.current().location, decorators,
+      name: '', parentTypeName: '', assignments: [],
+    };
+    this.advance(); // 'asset'
+    out.name = this.expectIdentifier('asset name');
+    if (!this.expect(BacTokenKind.Colon, "':' before asset parent type")) { return out; }
+    out.parentTypeName = this.expectIdentifier('parent class name');
+    this.skipNewlines();
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open asset body")) { return out; }
+
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+      const location = this.current().location;
+      const name = this.expectAssignmentName('asset property name');
+      if (!name) { break; }
+      if (!this.expect(BacTokenKind.Assign, "'=' after asset property name")) { break; }
+      const value = this.parseExpr();
+      if (!value) { break; }
+      out.assignments.push({ name, value, location });
+      this.skipNewlines();
+      this.match(BacTokenKind.Comma);
+    }
+
+    this.expect(BacTokenKind.RBrace, "'}' to close asset body");
     return out;
   }
 

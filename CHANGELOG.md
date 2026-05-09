@@ -12,6 +12,23 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `asset Foo : ParentClass { … }` UObject instance documents (top-level keyword mirror)
+- Top-level parser dispatch on `class` / `struct` / `asset` (the third
+  shipping with this slice). Mirrors BAC plugin commit f2ae7c4.
+  Reuses the existing `Kw_Asset` token (already used inside expressions
+  for `asset("/Game/...")` literals); the parser disambiguates by
+  position. New `BacAssetDecl` AST node + `asset?` slot on
+  `BacScriptAst`.
+- IDE no longer flags `Roundtrip_Asset.bac` (and similar asset
+  documents) with `BAC1010`.
+- LSP passes already early-return when `ast.class` is missing, so an
+  asset-only document no-ops cleanly through every navigation /
+  validator pass. Hover / nav / completion polish for asset properties
+  is a follow-up.
+- Engine side (already shipped): `IBacGenerator::GenerateAsset` +
+  `IBacTranscriber::TranscribeAsset` + `RunRoundtripAsset` helper +
+  fixed-point name-mask extension to cover the `asset` header.
+
 ### Added — `struct Foo { … }` UUserDefinedStruct documents (top-level keyword mirror)
 - New `Kw_Struct` token + `BacStructDecl` AST node + parser dispatch on
   `class` vs `struct` at the top level. Mirrors BAC plugin commit
