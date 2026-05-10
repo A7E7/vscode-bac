@@ -1280,6 +1280,10 @@
             "named": false
           },
           {
+            "type": "const",
+            "named": false
+          },
+          {
             "type": "default",
             "named": false
           },
@@ -2486,6 +2490,20 @@
           }
         ]
       },
+      "modifier": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "ref",
+            "named": false
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -3344,6 +3362,10 @@
     "named": false
   },
   {
+    "type": "const",
+    "named": false
+  },
+  {
     "type": "construction",
     "named": false
   },
@@ -3429,6 +3451,10 @@
   },
   {
     "type": "pure",
+    "named": false
+  },
+  {
+    "type": "ref",
     "named": false
   },
   {

@@ -77,7 +77,10 @@ module.exports = grammar({
       )),
     ),
 
-    // Decorator names may collide with reserved keywords (e.g. `@event`).
+    // Decorator names may collide with reserved keywords (e.g. `@event`,
+    // `@const`). Tree-sitter promotes any string literal to a keyword
+    // token once it appears in a rule; without this `choice` the keyword
+    // tokens wouldn't match the identifier branch of a decorator name.
     _decorator_name: $ => choice(
       $.identifier,
       'event',
@@ -87,6 +90,7 @@ module.exports = grammar({
       'var',
       'let',
       'pure',
+      'const',  // function-level @const → FUNC_Const
     ),
 
     decorator_arg: $ => choice(
@@ -220,6 +224,11 @@ module.exports = grammar({
 
     parameter: $ => seq(
       repeat($.decorator),
+      // Optional `ref` / `const` modifiers — order is flexible. Each one
+      // sets the corresponding bit on the BP-side `FEdGraphPinType`
+      // (`bIsReference` / `bIsConst`), which UE compiles into
+      // `CPF_ReferenceParm` / `CPF_ConstParm` on the generated UFunction.
+      repeat(field('modifier', choice('ref', 'const'))),
       field('name', $.identifier),
       ':',
       field('type', $.type_ref),

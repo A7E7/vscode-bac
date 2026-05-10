@@ -23,6 +23,8 @@
   "construction"
   "settings"
   "defaults"
+  "ref"
+  "const"
 ] @keyword
 
 [

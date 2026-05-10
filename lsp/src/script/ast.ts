@@ -163,6 +163,12 @@ export interface BacParam {
   type:        BacTypeRef;
   default?:    BacExpr;
   decorators:  BacDecorator[];
+  /** `ref` modifier — pin gets `CPF_ReferenceParm`. The BP "Pass-by-Reference"
+   *  checkbox writes this. Pin direction stays as the function declares it. */
+  bIsByRef?:   boolean;
+  /** `const` modifier — pin gets `CPF_ConstParm`. The BP "Const" checkbox on
+   *  a parameter writes this; signals the body must not mutate the value. */
+  bIsConst?:   boolean;
 }
 
 export interface BacAssignment {

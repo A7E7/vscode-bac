@@ -324,7 +324,11 @@ class Parser {
   }
 
   private isKeywordTokenKind(k: BacTokenKind): boolean {
-    return k >= BacTokenKind.Kw_Class && k <= BacTokenKind.Kw_New;
+    // Accept the entire `Kw_*` block — any keyword token can serve as a
+    // decorator name (e.g. `@event`, `@default`, `@const`). The upper
+    // bound is the LAST keyword in `BacTokenKind` (currently `Kw_Const`);
+    // mirrors `BacParser::TryConsumeNameAllowingKeywords` on the C++ side.
+    return k >= BacTokenKind.Kw_Class && k <= BacTokenKind.Kw_Const;
   }
   private tryConsumeNameAllowingKeywords(): string | undefined {
     const k = this.current().kind;
@@ -708,6 +712,16 @@ class Parser {
 
   private parseParam(): ast.BacParam | undefined {
     const decorators = this.parseDecorators();
+    // `ref` / `const` modifiers — order is flexible (`ref const x` and
+    // `const ref x` both parse) and either can be omitted. Mirrors the
+    // C++ side at `BacParser.cpp::ParseParam`. Duplicates collapse
+    // silently; idempotent on the BP-side flag bits.
+    let bIsByRef = false;
+    let bIsConst = false;
+    while (this.check(BacTokenKind.Kw_Ref) || this.check(BacTokenKind.Kw_Const)) {
+      if (this.match(BacTokenKind.Kw_Ref))        { bIsByRef = true; }
+      else if (this.match(BacTokenKind.Kw_Const)) { bIsConst = true; }
+    }
     const name = this.expectIdentifier('parameter name');
     if (!name) { return undefined; }
     if (!this.expect(BacTokenKind.Colon, "':' before parameter type")) { return undefined; }
@@ -717,7 +731,7 @@ class Parser {
       const e = this.parseExpr();
       if (e) { defaultExpr = e; }
     }
-    return { name, type, decorators, default: defaultExpr };
+    return { name, type, decorators, default: defaultExpr, bIsByRef, bIsConst };
   }
 
   // ─── Types ───────────────────────────────────────────────────────────────

@@ -108,6 +108,11 @@
         {
           "name": "keyword.other.bac",
           "match": "\\b(attach|construction|settings|defaults)\\b"
+        },
+        {
+          "comment": "Parameter modifiers — `function foo(ref hp: float, const Source: Actor)`",
+          "name": "storage.modifier.bac",
+          "match": "\\b(ref|const)\\b"
         }
       ]
     },

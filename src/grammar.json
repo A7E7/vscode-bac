@@ -205,6 +205,10 @@
         {
           "type": "STRING",
           "value": "pure"
+        },
+        {
+          "type": "STRING",
+          "value": "const"
         }
       ]
     },
@@ -964,6 +968,26 @@
           "content": {
             "type": "SYMBOL",
             "name": "decorator"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "FIELD",
+            "name": "modifier",
+            "content": {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "ref"
+                },
+                {
+                  "type": "STRING",
+                  "value": "const"
+                }
+              ]
+            }
           }
         },
         {

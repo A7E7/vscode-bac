@@ -70,6 +70,94 @@ function memberToTarget(k: ast.BacMember['kind']): Target {
   }
 }
 
+// ─── Decorator target bitmasks ──────────────────────────────────────────────
+//
+// Multi-target decorators (`@deprecated`, `@tooltip`, `@meta`, …) need a
+// concise way to express "valid on var, function, event, macro" without
+// a separate catalog per target. Each mask bit corresponds to one
+// declaration target.
+const TARGET_VAR        = 1 << 0;
+const TARGET_FN         = 1 << 1;
+const TARGET_EVT        = 1 << 2;
+const TARGET_MAC        = 1 << 3;
+const TARGET_FN_LIKE    = TARGET_FN | TARGET_EVT | TARGET_MAC;     // share FKismetUserDeclaredFunctionMetadata
+const TARGET_ALL_DECLS  = TARGET_VAR | TARGET_FN_LIKE;
+
+function targetToMask(t: Target): number {
+  switch (t) {
+    case 'variable': return TARGET_VAR;
+    case 'function': return TARGET_FN;
+    case 'event':    return TARGET_EVT;
+    case 'macro':    return TARGET_MAC;
+    default:         return 0;
+  }
+}
+
+function targetMaskToList(mask: number): string {
+  const parts: string[] = [];
+  if (mask & TARGET_VAR) { parts.push('var'); }
+  if (mask & TARGET_FN)  { parts.push('function'); }
+  if (mask & TARGET_EVT) { parts.push('event'); }
+  if (mask & TARGET_MAC) { parts.push('macro'); }
+  return parts.join(', ');
+}
+
+// ─── Decorator catalog ──────────────────────────────────────────────────────
+//
+// Each entry maps a decorator name to the set of targets that accept it.
+// Mappings to BP-side CPF flags / metadata keys live in the C++ appliers
+// (BacGenVariable for `var`; BacGenFunction for the rest); the validator
+// here only checks shape (target + arg count + arg shape).
+interface DecoratorEntry { name: string; targetMask: number; }
+
+const ZERO_ARG_DECORATORS: DecoratorEntry[] = [
+  // Variable-only:
+  { name: 'editable',                          targetMask: TARGET_VAR },
+  { name: 'readonly',                          targetMask: TARGET_VAR },
+  { name: 'expose_on_spawn',                   targetMask: TARGET_VAR },
+  { name: 'private',                           targetMask: TARGET_VAR },
+  { name: 'interp',                            targetMask: TARGET_VAR },
+  { name: 'config',                            targetMask: TARGET_VAR },
+  { name: 'transient',                         targetMask: TARGET_VAR },
+  { name: 'savegame',                          targetMask: TARGET_VAR },
+  { name: 'advanced_display',                  targetMask: TARGET_VAR },
+  // Function-only (UFunction ExtraFlags bits):
+  { name: 'const',                             targetMask: TARGET_FN },
+  { name: 'exec',                              targetMask: TARGET_FN },
+  // Function + event + macro (FKismetUserDeclaredFunctionMetadata bool fields):
+  { name: 'thread_safe',                       targetMask: TARGET_FN_LIKE },
+  { name: 'unsafe_during_actor_construction',  targetMask: TARGET_FN_LIKE },
+  { name: 'call_in_editor',                    targetMask: TARGET_FN_LIKE },
+  // Universal (different storage per target — the appliers route correctly):
+  { name: 'deprecated',                        targetMask: TARGET_ALL_DECLS },
+];
+
+const STRING_META_DECORATORS: DecoratorEntry[] = [
+  { name: 'tooltip',             targetMask: TARGET_ALL_DECLS },
+  { name: 'deprecation_message', targetMask: TARGET_ALL_DECLS },
+  { name: 'category',            targetMask: TARGET_ALL_DECLS },
+  { name: 'keywords',            targetMask: TARGET_FN_LIKE },
+  { name: 'compact_node_title',  targetMask: TARGET_FN_LIKE },
+];
+
+// `ELifetimeCondition` enum values (engine `CoreNetTypes.h`) with the
+// `COND_` prefix stripped. Hidden values (`Dynamic`, `NetGroup`, `Max`)
+// excluded — they aren't user-selectable in the BP UI.
+const REPLICATION_CONDITIONS = [
+  'None', 'InitialOnly', 'OwnerOnly', 'SkipOwner', 'SimulatedOnly',
+  'AutonomousOnly', 'SimulatedOrPhysics', 'InitialOrOwner', 'Custom',
+  'ReplayOrOwner', 'ReplayOnly', 'SimulatedOnlyNoReplay',
+  'SimulatedOrPhysicsNoReplay', 'SkipReplay', 'Never',
+];
+function isKnownReplicationCondition(name: string): boolean {
+  return REPLICATION_CONDITIONS.includes(name);
+}
+
+const ACCESS_SPECIFIERS = ['public', 'protected', 'private'];
+function isKnownAccessSpecifier(name: string): boolean {
+  return ACCESS_SPECIFIERS.includes(name);
+}
+
 // ─── Tiny expr-kind helpers ─────────────────────────────────────────────────
 function isStringLit(e: ast.BacExpr | undefined): boolean { return !!e && e.kind === 'string_lit'; }
 function isBoolLit  (e: ast.BacExpr | undefined): boolean { return !!e && e.kind === 'bool_lit'; }
@@ -94,9 +182,40 @@ function emitUnknownArg(out: BacDiagnostics, d: ast.BacDecorator, argName: strin
 }
 
 function validateDecorator(d: ast.BacDecorator, target: Target, out: BacDiagnostics): void {
+  const targetBit = targetToMask(target);
+
+  // ─── Zero-arg flag decorators (catalog dispatch) ───────────────────────
+  for (const entry of ZERO_ARG_DECORATORS) {
+    if (d.name === entry.name) {
+      if (!(entry.targetMask & targetBit)) {
+        emitWrongTarget(out, d, target, targetMaskToList(entry.targetMask));
+        return;
+      }
+      if (d.args.length !== 0) { emitBadArity(out, d, 0, d.args.length); }
+      return;
+    }
+  }
+
+  // ─── One-positional-string-lit metadata decorators ─────────────────────
+  for (const entry of STRING_META_DECORATORS) {
+    if (d.name === entry.name) {
+      if (!(entry.targetMask & targetBit)) {
+        emitWrongTarget(out, d, target, targetMaskToList(entry.targetMask));
+        return;
+      }
+      if (d.args.length !== 1) { emitBadArity(out, d, 1, d.args.length); return; }
+      if (d.args[0].name) {
+        out.error(`Decorator @${d.name} expects a positional argument, not named '${d.args[0].name}'.`,
+          d.location, 'BAC2103');
+      }
+      if (!isStringLit(d.args[0].value)) {
+        out.error(`Decorator @${d.name} expects a string literal argument.`, d.location, 'BAC2103');
+      }
+      return;
+    }
+  }
+
   switch (d.name) {
-    case 'editable':
-    case 'readonly':
     case 'bind_widget':
     case 'bind_widget_optional': {
       if (target !== 'variable') { emitWrongTarget(out, d, target, 'var'); return; }
@@ -109,21 +228,69 @@ function validateDecorator(d: ast.BacDecorator, target: Target, out: BacDiagnost
       if (d.args.length !== 0) { emitBadArity(out, d, 0, d.args.length); }
       return;
     }
-    case 'category': {
-      if (target !== 'variable' && target !== 'function' && target !== 'event') {
-        emitWrongTarget(out, d, target, 'var, function, event');
+
+    // `@display("Original Name")` — preserves a BP-side name that wasn't a
+    // valid `.bac` identifier (illegal chars stripped, or keyword-collision
+    // suffix). Allowed on var | function | event | macro.
+    case 'display': {
+      const allowedMask = TARGET_ALL_DECLS;
+      if (!(allowedMask & targetBit)) {
+        emitWrongTarget(out, d, target, targetMaskToList(allowedMask));
         return;
       }
       if (d.args.length !== 1) { emitBadArity(out, d, 1, d.args.length); return; }
       if (d.args[0].name) {
-        out.error(`Decorator @category expects a positional argument, not named '${d.args[0].name}'.`,
+        out.error(`Decorator @display expects a positional argument, not named '${d.args[0].name}'.`,
           d.location, 'BAC2103');
       }
       if (!isStringLit(d.args[0].value)) {
-        out.error('Decorator @category expects a string literal argument.', d.location, 'BAC2103');
+        out.error('Decorator @display expects a string literal argument.', d.location, 'BAC2103');
       }
       return;
     }
+
+    // `@access(public | protected | private)` — function-level access
+    // specifier. Sets one of `FUNC_Public`/`FUNC_Protected`/`FUNC_Private`
+    // on the entry node's ExtraFlags. Default (no decorator) = public.
+    case 'access': {
+      if (target !== 'function') { emitWrongTarget(out, d, target, 'function'); return; }
+      if (d.args.length !== 1 || d.args[0].name) {
+        out.error('@access expects exactly one positional argument.', d.location, 'BAC2107');
+        return;
+      }
+      const v = d.args[0].value;
+      if (!v || v.kind !== 'ident' || !isKnownAccessSpecifier(v.name)) {
+        out.error('@access expects one of: public, protected, private.', d.location, 'BAC2108');
+      }
+      return;
+    }
+
+    // `@meta(Key="value", Other="other")` — escape hatch for any UE metadata
+    // key not promoted to a first-class decorator. Each arg is named (the
+    // key); each value is a string literal. Allowed on var | function-like.
+    case 'meta': {
+      const allowedMask = TARGET_ALL_DECLS;
+      if (!(allowedMask & targetBit)) {
+        emitWrongTarget(out, d, target, targetMaskToList(allowedMask));
+        return;
+      }
+      if (d.args.length === 0) {
+        out.error('Decorator @meta expects at least one Key="value" pair.', d.location, 'BAC2102');
+        return;
+      }
+      for (const arg of d.args) {
+        if (!arg.name) {
+          out.error('Decorator @meta expects named arguments (Key="value").', d.location, 'BAC2103');
+          continue;
+        }
+        if (!isStringLit(arg.value)) {
+          out.error(`Decorator @meta value for '${arg.name}' must be a string literal.`,
+            d.location, 'BAC2103');
+        }
+      }
+      return;
+    }
+
     case 'replicated': {
       if (target !== 'variable') { emitWrongTarget(out, d, target, 'var'); return; }
       for (const arg of d.args) {
@@ -132,8 +299,20 @@ function validateDecorator(d: ast.BacDecorator, target: Target, out: BacDiagnost
             out.error('@replicated repnotify expects a function name (identifier).',
               d.location, 'BAC2104');
           }
+        } else if (arg.name === 'condition') {
+          // Identifier (no `COND_` prefix) drawn from `ELifetimeCondition`.
+          // Stored on `FBPVariableDescription::ReplicationCondition` (a
+          // dedicated enum field, not a metadata key).
+          if (!arg.value || arg.value.kind !== 'ident' || !isKnownReplicationCondition(arg.value.name)) {
+            out.error(
+              '@replicated condition expects one of: None, InitialOnly, OwnerOnly, '
+              + 'SkipOwner, SimulatedOnly, AutonomousOnly, SimulatedOrPhysics, '
+              + 'InitialOrOwner, Custom, ReplayOrOwner, ReplayOnly, '
+              + 'SimulatedOnlyNoReplay, SimulatedOrPhysicsNoReplay, SkipReplay, Never.',
+              d.location, 'BAC2108');
+          }
         } else {
-          emitUnknownArg(out, d, arg.name ?? '', 'repnotify');
+          emitUnknownArg(out, d, arg.name ?? '', 'repnotify, condition');
         }
       }
       return;

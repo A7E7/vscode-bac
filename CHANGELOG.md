@@ -12,6 +12,55 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Parity with BlueprintAsCode property-panel round-trip work
+- **Param modifiers `ref` / `const`** on function / event / macro
+  parameters: `function ApplyDelta(ref hp: float, const Source: Actor)`.
+  Order is flexible (`ref const x` and `const ref x` both parse).
+  Mirrors the C++ side at `BacParser.cpp::ParseParam`.
+  * `lsp/src/script/token.ts` — added `Kw_Ref` / `Kw_Const` enum members
+    and the lexeme entries in `KW_NAMES`.
+  * `lsp/src/script/parser.ts` — `parseParam` consumes the modifiers and
+    sets `bIsByRef` / `bIsConst` on `BacParam`.
+  * `lsp/src/script/ast.ts` — `BacParam` carries the two flags.
+  * `grammar.js` — parameter rule accepts `repeat(field('modifier',
+    choice('ref', 'const')))` after decorators. `'const'` joins the
+    `_decorator_name` choice list because `@const` is a valid
+    function-level decorator and tree-sitter promotes string literals to
+    keyword tokens once they appear in any rule.
+  * `queries/highlights.scm` — `ref` / `const` highlighted as keywords.
+  * `editors/code/syntaxes/bac.tmLanguage.json` — `ref` / `const` get
+    the `storage.modifier.bac` scope inside the member-keywords block.
+- **Full decorator surface in `contract-check.ts`** — replaces the old
+  switch with catalog-driven dispatch matching
+  `Plugins/.../Validate/BacContractCheck.cpp` line for line:
+  * Zero-arg flag decorators on `var` only: `@editable`, `@readonly`,
+    `@expose_on_spawn`, `@private`, `@interp`, `@config`, `@transient`,
+    `@savegame`, `@advanced_display`.
+  * Zero-arg flag decorators on `function` only: `@const`, `@exec`.
+  * Zero-arg flag decorators on `function` + `event` + `macro`:
+    `@thread_safe`, `@unsafe_during_actor_construction`,
+    `@call_in_editor`.
+  * `@deprecated` accepts var | function | event | macro (different
+    storage per target, but the LSP only checks shape).
+  * One-positional-string-lit metadata decorators: `@tooltip`,
+    `@deprecation_message`, `@category` accept all four targets;
+    `@keywords` and `@compact_node_title` accept function | event |
+    macro.
+  * `@display(...)` accepts var | function | event | macro.
+  * `@access(public | protected | private)` accepts function only.
+  * `@meta(Key="value", ...)` accepts var | function | event | macro.
+  * `@replicated` grows a `condition = <Name>` named arg drawn from the
+    `ELifetimeCondition` allowlist (no `COND_` prefix).
+- **Target bitmasks**: `TARGET_VAR | TARGET_FN | TARGET_EVT | TARGET_MAC`,
+  with `TARGET_FN_LIKE` and `TARGET_ALL_DECLS` shorthands. Each catalog
+  entry carries a `targetMask`; `targetMaskToList` builds the
+  wrong-target diagnostic message dynamically.
+- The catalog dispatch eliminates the previous warning storm
+  (`BAC2199 Unknown decorator @…`) on the LSP side that was visible
+  while the C++ surface had advanced past the LSP. The two
+  implementations are now in sync for the variable + function +
+  event + macro decorator surface.
+
 ### Removed — `@replicated_default` decorator (lockstep with plugin)
 - The class-level `@replicated_default(replicates=true)` decorator no longer
   exists. Replication now lives in the `defaults { bReplicates = true }`
