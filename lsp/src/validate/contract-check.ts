@@ -76,12 +76,14 @@ function memberToTarget(k: ast.BacMember['kind']): Target {
 // concise way to express "valid on var, function, event, macro" without
 // a separate catalog per target. Each mask bit corresponds to one
 // declaration target.
-const TARGET_VAR        = 1 << 0;
-const TARGET_FN         = 1 << 1;
-const TARGET_EVT        = 1 << 2;
-const TARGET_MAC        = 1 << 3;
-const TARGET_FN_LIKE    = TARGET_FN | TARGET_EVT | TARGET_MAC;     // share FKismetUserDeclaredFunctionMetadata
-const TARGET_ALL_DECLS  = TARGET_VAR | TARGET_FN_LIKE;
+const TARGET_VAR             = 1 << 0;
+const TARGET_FN              = 1 << 1;
+const TARGET_EVT             = 1 << 2;
+const TARGET_MAC             = 1 << 3;
+const TARGET_PARAM           = 1 << 4;  // function/event/macro parameter pins
+const TARGET_FN_LIKE         = TARGET_FN | TARGET_EVT | TARGET_MAC;     // share FKismetUserDeclaredFunctionMetadata
+const TARGET_ALL_DECLS       = TARGET_VAR | TARGET_FN_LIKE;
+const TARGET_ALL_DECLS_PARAM = TARGET_ALL_DECLS | TARGET_PARAM;
 
 function targetToMask(t: Target): number {
   switch (t) {
@@ -89,16 +91,18 @@ function targetToMask(t: Target): number {
     case 'function': return TARGET_FN;
     case 'event':    return TARGET_EVT;
     case 'macro':    return TARGET_MAC;
+    case 'param':    return TARGET_PARAM;
     default:         return 0;
   }
 }
 
 function targetMaskToList(mask: number): string {
   const parts: string[] = [];
-  if (mask & TARGET_VAR) { parts.push('var'); }
-  if (mask & TARGET_FN)  { parts.push('function'); }
-  if (mask & TARGET_EVT) { parts.push('event'); }
-  if (mask & TARGET_MAC) { parts.push('macro'); }
+  if (mask & TARGET_VAR)   { parts.push('var'); }
+  if (mask & TARGET_FN)    { parts.push('function'); }
+  if (mask & TARGET_EVT)   { parts.push('event'); }
+  if (mask & TARGET_MAC)   { parts.push('macro'); }
+  if (mask & TARGET_PARAM) { parts.push('parameter'); }
   return parts.join(', ');
 }
 
@@ -231,9 +235,12 @@ function validateDecorator(d: ast.BacDecorator, target: Target, out: BacDiagnost
 
     // `@display("Original Name")` — preserves a BP-side name that wasn't a
     // valid `.bac` identifier (illegal chars stripped, or keyword-collision
-    // suffix). Allowed on var | function | event | macro.
+    // suffix). Allowed on var | function | event | macro | param. Round-trip
+    // targets: variable's MetaDataArray["DisplayName"] / entry node's
+    // MetaData["DisplayName"] / live `UEdGraphPin::PinFriendlyName` for
+    // params.
     case 'display': {
-      const allowedMask = TARGET_ALL_DECLS;
+      const allowedMask = TARGET_ALL_DECLS_PARAM;
       if (!(allowedMask & targetBit)) {
         emitWrongTarget(out, d, target, targetMaskToList(allowedMask));
         return;
