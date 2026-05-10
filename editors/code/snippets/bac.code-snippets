@@ -11,8 +11,10 @@
   "Replicated Actor class": {
     "prefix": "classrep",
     "body": [
-      "@replicated_default(replicates=true)",
       "class ${1:Name} : Actor {",
+      "  defaults {",
+      "    bReplicates = true",
+      "  }",
       "  $0",
       "}"
     ],

@@ -12,6 +12,25 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Removed — `@replicated_default` decorator (lockstep with plugin)
+- The class-level `@replicated_default(replicates=true)` decorator no longer
+  exists. Replication now lives in the `defaults { bReplicates = true }`
+  block — the same surface as every other CDO override. Coordinated with
+  the BlueprintAsCode plugin (parser, generator, transcriber, validator).
+- **Validator (BAC2240)**: `@replicated`, `@runson`, and `@event(runson=…)`
+  members now require the class's `defaults` block to set
+  `bReplicates = true`. Diagnostic message and quick-fix string updated to
+  point at the defaults block instead of the (gone) decorator. The
+  code-action handler that previously inserted the decorator above the
+  class is retired (the new fix needs to insert into / create a defaults
+  block — left as a hint string for now).
+- **Snippet** `classrep` rewritten to expand into the defaults-block form.
+  **Tree-sitter corpus**: the "Replicated class with RepNotify var" test now
+  uses the defaults block.
+- **Wire-stable contract**: `.bac` grammar accepted by `BacScriptParser` /
+  `BacLexer` / `BacParser` (and the TS mirror) no longer accepts
+  `@replicated_default`.
+
 ### Added — Asset / table body completion routes through the engine proxy (gap 7.1)
 - `findScopeAt` carries two new optional fields: `assetContext.parentTypeName`
   and `rowContext.rowStructName`. When the cursor sits inside an

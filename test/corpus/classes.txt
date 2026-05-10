@@ -51,8 +51,11 @@ class Pickup : Actor {
 Replicated class with RepNotify var
 ==================
 
-@replicated_default(replicates=true)
 class T : Actor {
+  defaults {
+    bReplicates = true
+  }
+
   @replicated(repnotify = OnRep_Foo)
   var Foo: int = 0
 
@@ -62,13 +65,14 @@ class T : Actor {
 ---
 
 (source_file
-  (decorator
-    name: (identifier)
-    (decorator_arg name: (identifier) value: (bool_literal)))
   (class_declaration
     name: (identifier)
     parent: (identifier)
     body: (class_body
+      (defaults_block
+        (class_assignment
+          name: (identifier)
+          value: (bool_literal)))
       (variable_decl
         (decorator
           name: (identifier)

@@ -74,7 +74,7 @@ function replaceFix(
 
 // "add `X` before `Y`"  →  insert X on a new line above the line that holds
 // Y, matching that line's leading whitespace so indentation stays sane.
-// Used by BAC2240 (`add @replicated_default(replicates=true) before class X`).
+// (Currently no diagnostic emits this pattern — kept for future use.)
 const INSERT_BEFORE_RE = /^add\s+`([^`]+)`\s+before\s+`([^`]+)`\s*$/i;
 
 function insertBeforeFix(

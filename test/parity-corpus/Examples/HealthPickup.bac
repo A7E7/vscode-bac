@@ -6,8 +6,11 @@ import { IInteractable } from "/Game/Interfaces/IInteractable"
 import { HealthComponent } from "/Game/Components/HealthComponent"
 
 @blueprintable
-@replicated_default(replicates=true, alwaysRelevant=false)
 class HealthPickup : Actor implements IInteractable {
+
+  defaults {
+    bReplicates = true
+  }
 
   // ─── Components ─────────────────────────────────────────────
   component Root: SceneComponent

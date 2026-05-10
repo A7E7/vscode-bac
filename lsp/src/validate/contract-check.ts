@@ -138,20 +138,6 @@ function validateDecorator(d: ast.BacDecorator, target: Target, out: BacDiagnost
       }
       return;
     }
-    case 'replicated_default': {
-      if (target !== 'class') { emitWrongTarget(out, d, target, 'class'); return; }
-      for (const arg of d.args) {
-        if (arg.name !== 'replicates' && arg.name !== 'alwaysRelevant') {
-          emitUnknownArg(out, d, arg.name ?? '', 'replicates, alwaysRelevant');
-          continue;
-        }
-        if (!isBoolLit(arg.value)) {
-          out.error(`@replicated_default '${arg.name}' expects a bool literal.`,
-            d.location, 'BAC2106');
-        }
-      }
-      return;
-    }
     case 'event': {
       if (target !== 'event') { emitWrongTarget(out, d, target, 'event'); return; }
       for (const arg of d.args) {
@@ -260,15 +246,13 @@ function checkFunctionContract(f: ast.BacFunctionDecl, out: BacDiagnostics): voi
 
 // ─── Class-level replication consistency ───────────────────────────────────
 function classDeclaresReplication(cls: ast.BacClassDecl): boolean {
-  for (const d of cls.decorators) {
-    if (d.name !== 'replicated_default') { continue; }
-    let replicates = true;
-    for (const arg of d.args) {
-      if (arg.name === 'replicates' && arg.value && arg.value.kind === 'bool_lit') {
-        replicates = arg.value.value;
+  for (const m of cls.members) {
+    if (m.kind !== 'defaults') { continue; }
+    for (const a of m.assignments) {
+      if (a.name === 'bReplicates' && a.value && a.value.kind === 'bool_lit' && a.value.value) {
+        return true;
       }
     }
-    if (replicates) { return true; }
   }
   return false;
 }
@@ -290,9 +274,9 @@ function checkReplicationConsistency(cls: ast.BacClassDecl, out: BacDiagnostics)
         severity: 'error',
         code:     'BAC2240',
         location: d.location,
-        message:  `@${d.name} implies the class must replicate, but '${cls.name}' has no @replicated_default(replicates=true).`,
-        hint:     `Add \`@replicated_default(replicates=true)\` above \`class ${cls.name}\`.`,
-        fixes:    [`add \`@replicated_default(replicates=true)\` before \`class ${cls.name}\``],
+        message:  `@${d.name} implies the class must replicate, but '${cls.name}' does not set \`bReplicates = true\` in its \`defaults { … }\` block.`,
+        hint:     'Add `bReplicates = true` to the `defaults { … }` block of the class.',
+        fixes:    ['add `bReplicates = true` to defaults'],
       });
     }
   }
