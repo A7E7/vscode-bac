@@ -12,6 +12,17 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Changed — Diagnostic-code registry: `BAC3143` (widget animation collision)
+New info-level code surfaced by the engine-coupled lint path on the
+plugin side. Fires when a `UWidgetBlueprint` carries a `UWidgetAnimation`
+whose name collides with a script-side event/function/macro of the same
+name — the dupe-regen path drops the animation pre-compile (animations
+aren't yet round-tripped, so this is consistent with existing
+lossiness). No LSP-side code change; surfaced through the existing
+`bac.lint` diagnostic envelope. See
+[BlueprintAsCode CHANGELOG](https://github.com/A7E7/BlueprintAsCode/blob/main/CHANGELOG.md#unreleased)
+for the engine-side detail.
+
 ### Added — Parity with BlueprintAsCode property-panel round-trip work
 - **Param modifiers `ref` / `const`** on function / event / macro
   parameters: `function ApplyDelta(ref hp: float, const Source: Actor)`.
