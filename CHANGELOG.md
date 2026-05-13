@@ -12,6 +12,23 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Plugin-side `BAC2115` / `BAC2116` diagnostic codes (`@dynamic` decorator shape)
+
+Plugin mirror — the contract-pass validator now recognises the
+`@dynamic("<template-name>")` decorator that the transcriber emits for
+`K2Node_AddComponent` dynamic-spawn templates (UActorComponent
+archetypes living on `UBlueprint::ComponentTemplates` rather than the
+SCS tree). Without the branch, validator pass produced
+`BAC2199 Unknown decorator @dynamic` on every round-tripped dynamic
+component — noisy and broke "validator-clean" gating in tooling that
+consumes the LSP's diagnostic stream.
+
+LSP-side: no code change required. The TS validator port runs the same
+allowlist via the diagnostic codes wire. If you keep a local
+stable-code reference (some agent prompts do), add:
+- `BAC2115` — `@dynamic` wrong arity
+- `BAC2116` — `@dynamic` arg must be a string literal
+
 ### Added — `reset <label>` keyword + `@<label>` multi-exec postfix (out-of-chain exec input wiring)
 
 Mirrors the plugin-side addition. `.bac` can now reference multi-exec
