@@ -82,6 +82,21 @@
       "path": "Tests/Corpus/Validate_IdentifierParentResolved.bac",
       "passes": "AstOnly+Identifiers",
       "expected_error_codes": { "BAC2310": 0, "BAC2311": 0 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_OverrideOk.bac",
+      "passes": "AstOnly+Identifiers",
+      "expected_error_codes": { "BAC2350": 0, "BAC2351": 0 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_OverrideMissing.bac",
+      "passes": "AstOnly+Identifiers",
+      "expected_error_codes": { "BAC2350": 1 }
+    },
+    {
+      "path": "Tests/Corpus/Validate_OverrideSpurious.bac",
+      "passes": "AstOnly+Identifiers",
+      "expected_error_codes": { "BAC2351": 1 }
     }
   ]
 }
