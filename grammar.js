@@ -54,7 +54,7 @@ module.exports = grammar({
     source_file: $ => seq(
       repeat($.import_decl),
       repeat($.decorator),
-      $.class_declaration,
+      choice($.class_declaration, $.interface_declaration),
     ),
 
     import_decl: $ => seq(
@@ -108,6 +108,22 @@ module.exports = grammar({
         commaSep1(field('interface', $.identifier)),
       )),
       field('body', $.class_body),
+    ),
+
+    // ─── Interface declaration ────────────────────────────────────────────
+    // `interface IFoo { function Bar(args): Ret  event Baz(args) }` — Blueprint
+    // Interface. Body holds method signatures only (function or event); no
+    // var/component/defaults/settings — interfaces declare contracts, not state.
+    interface_declaration: $ => seq(
+      'interface',
+      field('name', $.identifier),
+      field('body', $.interface_body),
+    ),
+
+    interface_body: $ => seq(
+      '{',
+      repeat(choice($.function_decl, $.event_decl)),
+      '}',
     ),
 
     class_body: $ => seq(

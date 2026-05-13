@@ -12,6 +12,31 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `interface` keyword (BPTYPE_Interface authoring)
+
+`.bac` now supports a top-level `interface IFoo { … }` declaration that
+mirrors the plugin-side addition. Body holds method signatures only —
+`function Bar(args): Ret {}` and `event Baz(args) {}` — with all other
+member kinds rejected as **BAC1015** ("Only 'function' or 'event'
+declarations are allowed in an interface body"). No parent class or
+`implements` clause is permitted on the interface itself; UE auto-parents
+the resulting Blueprint to `UInterface`.
+
+The `event` vs `function` keyword choice in the interface body drives the
+implementor's override shape: `event` declarations carry
+`FUNC_BlueprintEvent` (BlueprintImplementableEvent — impl in a class body
+must use `event`); `function` declarations are plain BlueprintCallable
+(impl uses `function`).
+
+LSP changes that land in lockstep with the plugin side:
+- `Kw_Interface` lexer token + keyword (`token.ts`).
+- `BacInterfaceDecl` AST node + `interface?: BacInterfaceDecl` field on
+  `BacScriptAst` (`ast.ts`).
+- `parseInterfaceDecl` + top-level dispatcher branch (`parser.ts`).
+- Top-level error message at **BAC1010** now lists `'interface'`.
+- Tree-sitter grammar (`grammar.js`): new `interface_declaration` /
+  `interface_body` rules alongside `class_declaration`.
+
 ### Changed — Diagnostic-code registry: `BAC3143` (widget animation collision)
 New info-level code surfaced by the engine-coupled lint path on the
 plugin side. Fires when a `UWidgetBlueprint` carries a `UWidgetAnimation`

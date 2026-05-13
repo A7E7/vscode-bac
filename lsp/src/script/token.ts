@@ -21,6 +21,7 @@ export enum BacTokenKind {
 
   // Keywords — declaration
   Kw_Class,
+  Kw_Interface,
   Kw_Implements,
   Kw_Import,
   Kw_From,
@@ -118,6 +119,7 @@ export interface BacToken {
 
 const KW_NAMES: Record<string, BacTokenKind> = {
   class:        BacTokenKind.Kw_Class,
+  interface:    BacTokenKind.Kw_Interface,
   implements:   BacTokenKind.Kw_Implements,
   import:       BacTokenKind.Kw_Import,
   from:         BacTokenKind.Kw_From,

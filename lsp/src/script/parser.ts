@@ -134,6 +134,8 @@ class Parser {
 
     if (this.check(BacTokenKind.Kw_Class)) {
       out.class = this.parseClassDecl(topDecorators);
+    } else if (this.check(BacTokenKind.Kw_Interface)) {
+      out.interface = this.parseInterfaceDecl(topDecorators);
     } else if (this.check(BacTokenKind.Kw_Struct)) {
       out.struct = this.parseStructDecl(topDecorators);
     } else if (this.check(BacTokenKind.Kw_Asset)) {
@@ -141,7 +143,7 @@ class Parser {
     } else if (this.check(BacTokenKind.Kw_Table)) {
       out.table = this.parseTableDecl(topDecorators);
     } else {
-      this.error("Expected 'class', 'struct', 'asset', or 'table' declaration after imports/decorators.",
+      this.error("Expected 'class', 'interface', 'struct', 'asset', or 'table' declaration after imports/decorators.",
         this.current().location, 'BAC1010');
       return out;
     }
@@ -402,6 +404,42 @@ class Parser {
       else   { this.syncToMemberOrEnd(); }
     }
     this.expect(BacTokenKind.RBrace, "'}' to close class body");
+    return out;
+  }
+
+  // ─── Interface ───────────────────────────────────────────────────────────
+  // `interface IFoo { function Bar(args): Ret  event Baz(args) }` — Blueprint
+  // Interface declaration. Body holds method signatures only (function or
+  // event); var/component/defaults/settings/construction/widget/macro are
+  // rejected with BAC1015. No `: Parent` (UE auto-parents to UInterface)
+  // and no `implements` clause.
+  private parseInterfaceDecl(decorators: ast.BacDecorator[]): ast.BacInterfaceDecl {
+    const out: ast.BacInterfaceDecl = {
+      location: this.current().location,
+      name: '', decorators, methods: [],
+    };
+    this.advance(); // 'interface'
+    out.name = this.expectIdentifier('interface name');
+    this.skipNewlines();
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open interface body")) { return out; }
+
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+
+      const memberStart = this.current().location;
+      const m = this.parseMember();
+      if (!m) { this.syncToMemberOrEnd(); continue; }
+
+      if (m.kind === 'function' || m.kind === 'event') {
+        out.methods.push(m);
+      } else {
+        this.error(
+          "Only 'function' or 'event' declarations are allowed in an interface body.",
+          memberStart, 'BAC1015');
+      }
+    }
+    this.expect(BacTokenKind.RBrace, "'}' to close interface body");
     return out;
   }
 

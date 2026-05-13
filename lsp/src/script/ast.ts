@@ -279,6 +279,19 @@ export interface BacClassDecl {
 }
 
 /**
+ * `interface IFoo { method-decls }` — Blueprint Interface (BPTYPE_Interface).
+ * Body restricted to `function` or `event` signatures with empty bodies; no
+ * state. Implementing classes write `class … implements IFoo { … }`.
+ * Mirrors the C++ FBacInterfaceDecl.
+ */
+export interface BacInterfaceDecl {
+  location:    BacSourceLocation;
+  name:        string;
+  decorators:  BacDecorator[];
+  methods:     BacMember[];     // BacFunctionDecl or BacEventDecl, bodies empty
+}
+
+/**
  * `struct Foo { var Field: Type … }` — UUserDefinedStruct asset. Mirrors the
  * C++ FBacStructDecl. Body is a flat list of variable declarations only.
  */
@@ -322,9 +335,10 @@ export interface BacTableDecl {
 }
 
 export interface BacScriptAst {
-  imports: BacImport[];
-  class?:  BacClassDecl;
-  struct?: BacStructDecl;
-  asset?:  BacAssetDecl;
-  table?:  BacTableDecl;
+  imports:    BacImport[];
+  class?:     BacClassDecl;
+  interface?: BacInterfaceDecl;
+  struct?:    BacStructDecl;
+  asset?:     BacAssetDecl;
+  table?:     BacTableDecl;
 }
