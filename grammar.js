@@ -102,10 +102,17 @@ module.exports = grammar({
     class_declaration: $ => seq(
       'class',
       field('name', $.identifier),
-      optional(seq(':', field('parent', $.identifier))),
+      optional(seq(
+        ':',
+        field('parent', $.identifier),
+        optional(field('parent_qualified_path', $.qualified_path)),
+      )),
       optional(seq(
         'implements',
-        commaSep1(field('interface', $.identifier)),
+        commaSep1(seq(
+          field('interface', $.identifier),
+          optional(field('interface_qualified_path', $.qualified_path)),
+        )),
       )),
       field('body', $.class_body),
     ),
@@ -256,6 +263,23 @@ module.exports = grammar({
       field('base', $.identifier),
       optional(seq('<', commaSep1($.type_ref), '>')),
       repeat(seq('[', ']')),
+      optional(field('qualified_path', $.qualified_path)),
+    )),
+
+    // `@/Game/Foo/AssetName` — optional disambiguation suffix on a type or
+    // class-name reference. Resolved by the plugin's BacTypeResolver against
+    // the asset registry. The trailing `.AssetName[_C]` form is also accepted
+    // for tolerance when authors paste full UE object paths.
+    // Right-associative so the optional `.identifier` tail prefers being
+    // absorbed into the qualified path over starting a member access on
+    // whatever follows (the conflict surfaces in cast-expression position
+    // like `expr as Type@/path.Asset.Member`).
+    qualified_path: $ => prec.right(seq(
+      '@',
+      '/',
+      $.identifier,
+      repeat(seq('/', $.identifier)),
+      optional(seq('.', $.identifier)),
     )),
 
     // ─── Statements ───────────────────────────────────────────────────────

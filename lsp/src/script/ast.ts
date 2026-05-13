@@ -24,6 +24,11 @@ export interface BacTypeRef {
   baseName:    string;             // "float", "Actor", "Set", "Map"
   genericArgs: BacTypeRef[];
   arrayDepth:  number;             // T[] -> 1, T[][] -> 2
+  // Optional `@/Game/Path/AssetName` qualifier — disambiguates short-name
+  // collisions across packages. Undefined when not written; resolver falls
+  // back to short-name lookup. Stored as-written; the plugin-side resolver
+  // normalises into a loadable object path.
+  qualifiedPath?: string;
 }
 
 // ─── Decorators ─────────────────────────────────────────────────────────────
@@ -280,12 +285,14 @@ export interface BacImport {
 }
 
 export interface BacClassDecl {
-  location:               BacSourceLocation;
-  name:                   string;
-  parentTypeName:         string;
-  implementedInterfaces:  string[];
-  decorators:             BacDecorator[];
-  members:                BacMember[];
+  location:                   BacSourceLocation;
+  name:                       string;
+  parentTypeName:             string;
+  parentQualifiedPath?:       string;          // optional `@/Game/...` on parent
+  implementedInterfaces:      string[];
+  interfaceQualifiedPaths?:   string[];        // parallel to implementedInterfaces; '' or undefined entries are unqualified
+  decorators:                 BacDecorator[];
+  members:                    BacMember[];
 }
 
 /**
@@ -319,11 +326,12 @@ export interface BacStructDecl {
  * `defaults { ... }` block uses.
  */
 export interface BacAssetDecl {
-  location:        BacSourceLocation;
-  name:            string;
-  parentTypeName:  string;
-  decorators:      BacDecorator[];
-  assignments:     BacAssignment[];
+  location:              BacSourceLocation;
+  name:                  string;
+  parentTypeName:        string;
+  parentQualifiedPath?:  string;
+  decorators:            BacDecorator[];
+  assignments:           BacAssignment[];
 }
 
 export interface BacTableRow {

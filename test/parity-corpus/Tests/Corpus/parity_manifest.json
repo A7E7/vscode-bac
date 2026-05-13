@@ -54,11 +54,6 @@
       "expected_error_codes": { "BAC2232": 1 }
     },
     {
-      "path": "Tests/Corpus/Validate_ReplicatedWithoutClass.bac",
-      "passes": "AstOnly",
-      "expected_error_codes": { "BAC2240": 1 }
-    },
-    {
       "path": "Tests/Corpus/Validate_GenericArityBad.bac",
       "passes": "AstOnly",
       "expected_error_codes": { "BAC2310": 2 }

@@ -121,10 +121,10 @@ function makeAction(
 
 // Find `needle` near the diagnostic line. We search a window that extends
 // a few lines BEFORE and AFTER the diagnostic — anchors can sit above
-// (e.g. `class X` for a BAC2240 fired on a `@replicated` decorator) or
-// below (e.g. `attach Reot` on the same component-decl line). If multiple
-// occurrences exist within the window, prefer the one closest to the
-// diagnostic line.
+// (e.g. the class header for a diagnostic fired on a decorator further down)
+// or below (e.g. `attach Reot` on the same component-decl line). If
+// multiple occurrences exist within the window, prefer the one closest
+// to the diagnostic line.
 function findInWindow(text: string, line0: number, needle: string): number {
   const startLine = Math.max(0, line0 - 4);
   const endLine   = line0 + 4;

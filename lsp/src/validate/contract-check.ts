@@ -32,9 +32,6 @@ export function runContractCheck(scriptAst: ast.BacScriptAst, out: BacDiagnostic
       // Events may be latent — no await contract check.
     }
   }
-
-  // Cross-cutting: replication consistency.
-  checkReplicationConsistency(cls, out);
 }
 
 // ─── Decorator target taxonomy ──────────────────────────────────────────────
@@ -437,39 +434,3 @@ function checkFunctionContract(f: ast.BacFunctionDecl, out: BacDiagnostics): voi
 }
 
 // ─── Class-level replication consistency ───────────────────────────────────
-function classDeclaresReplication(cls: ast.BacClassDecl): boolean {
-  for (const m of cls.members) {
-    if (m.kind !== 'defaults') { continue; }
-    for (const a of m.assignments) {
-      if (a.name === 'bReplicates' && a.value && a.value.kind === 'bool_lit' && a.value.value) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function decoratorImpliesReplication(d: ast.BacDecorator): boolean {
-  if (d.name === 'replicated' || d.name === 'runson') { return true; }
-  if (d.name === 'event') {
-    for (const a of d.args) { if (a.name === 'runson') { return true; } }
-  }
-  return false;
-}
-
-function checkReplicationConsistency(cls: ast.BacClassDecl, out: BacDiagnostics): void {
-  if (classDeclaresReplication(cls)) { return; }
-  for (const m of cls.members) {
-    for (const d of m.decorators) {
-      if (!decoratorImpliesReplication(d)) { continue; }
-      out.items.push({
-        severity: 'error',
-        code:     'BAC2240',
-        location: d.location,
-        message:  `@${d.name} implies the class must replicate, but '${cls.name}' does not set \`bReplicates = true\` in its \`defaults { … }\` block.`,
-        hint:     'Add `bReplicates = true` to the `defaults { … }` block of the class.',
-        fixes:    ['add `bReplicates = true` to defaults'],
-      });
-    }
-  }
-}

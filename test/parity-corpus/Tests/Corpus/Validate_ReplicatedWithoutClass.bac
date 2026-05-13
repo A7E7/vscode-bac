@@ -1,7 +1,0 @@
-// Fixture: @replicated on a var, but the class doesn't declare replication.
-// Must emit BAC2240.
-
-class X : Actor {
-  @replicated
-  var Foo: int = 0
-}

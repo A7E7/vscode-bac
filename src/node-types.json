@@ -1054,6 +1054,16 @@
           }
         ]
       },
+      "interface_qualified_path": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_path",
+            "named": true
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -1070,6 +1080,16 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "parent_qualified_path": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_path",
             "named": true
           }
         ]
@@ -2673,6 +2693,21 @@
     }
   },
   {
+    "type": "qualified_path",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "reset_statement",
     "named": true,
     "fields": {
@@ -2844,6 +2879,16 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "qualified_path": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "qualified_path",
             "named": true
           }
         ]

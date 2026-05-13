@@ -103,9 +103,16 @@ function printClass(cls: ast.BacClassDecl, cursor: CommentCursor): Doc {
     parts.push(hardline);
   }
   parts.push('class ', cls.name);
-  if (cls.parentTypeName) { parts.push(' : ', cls.parentTypeName); }
+  if (cls.parentTypeName) {
+    parts.push(' : ', cls.parentTypeName);
+    if (cls.parentQualifiedPath) { parts.push('@', cls.parentQualifiedPath); }
+  }
   if (cls.implementedInterfaces.length > 0) {
-    parts.push(' implements ', cls.implementedInterfaces.join(', '));
+    const paths = cls.interfaceQualifiedPaths ?? [];
+    parts.push(' implements ', cls.implementedInterfaces.map((iface, i) => {
+      const qp = paths[i];
+      return qp ? `${iface}@${qp}` : iface;
+    }).join(', '));
   }
   parts.push(' {');
   // Members.
@@ -150,7 +157,9 @@ function printStruct(s: ast.BacStructDecl): Doc {
 function printAsset(a: ast.BacAssetDecl): Doc {
   const parts: Doc[] = [];
   for (const d of a.decorators) { parts.push(printDecorator(d), hardline); }
-  parts.push('asset ', a.name, ' : ', a.parentTypeName, ' {');
+  parts.push('asset ', a.name, ' : ', a.parentTypeName);
+  if (a.parentQualifiedPath) { parts.push('@', a.parentQualifiedPath); }
+  parts.push(' {');
   if (a.assignments.length === 0) { parts.push('}'); return parts; }
   const body: Doc[] = [];
   for (let i = 0; i < a.assignments.length; i++) {
@@ -460,6 +469,9 @@ function printType(t: ast.BacTypeRef): Doc {
   }
   for (let i = 0; i < t.arrayDepth; i++) {
     s = [s, '[]'];
+  }
+  if (t.qualifiedPath) {
+    s = [s, '@', t.qualifiedPath];
   }
   return s;
 }

@@ -203,6 +203,8 @@ class Parser {
     out.name = this.expectIdentifier('asset name');
     if (!this.expect(BacTokenKind.Colon, "':' before asset parent type")) { return out; }
     out.parentTypeName = this.expectIdentifier('parent class name');
+    const qp = this.parseOptionalQualifiedPath();
+    if (qp) { out.parentQualifiedPath = qp; }
     this.skipNewlines();
     if (!this.expect(BacTokenKind.LBrace, "'{' to open asset body")) { return out; }
 
@@ -382,15 +384,22 @@ class Parser {
     out.name = this.expectIdentifier('class name');
     if (this.match(BacTokenKind.Colon)) {
       out.parentTypeName = this.expectIdentifier('parent class name');
+      const qp = this.parseOptionalQualifiedPath();
+      if (qp) { out.parentQualifiedPath = qp; }
     }
     this.skipNewlines();
     if (this.match(BacTokenKind.Kw_Implements)) {
+      const ifacePaths: string[] = [];
       while (true) {
         this.skipNewlines();
         const iface = this.expectIdentifier('interface name');
         if (!iface) { break; }
         out.implementedInterfaces.push(iface);
+        ifacePaths.push(this.parseOptionalQualifiedPath());
         if (!this.match(BacTokenKind.Comma)) { break; }
+      }
+      if (ifacePaths.some(p => p !== '')) {
+        out.interfaceQualifiedPaths = ifacePaths;
       }
     }
     this.skipNewlines();
@@ -793,7 +802,26 @@ class Parser {
       this.expect(BacTokenKind.RBracket, "']' to close array marker");
       out.arrayDepth++;
     }
+    const qp = this.parseOptionalQualifiedPath();
+    if (qp) { out.qualifiedPath = qp; }
     return out;
+  }
+
+  // Optional `@/Game/Foo/Asset[.Object[_C]]` after a type or class-name
+  // identifier. Returns the path verbatim; the plugin-side resolver
+  // normalises into a loadable object path. 1:1 with C++ FParser::ParseOptionalQualifiedPath.
+  private parseOptionalQualifiedPath(): string {
+    if (!this.match(BacTokenKind.At)) { return ''; }
+    if (!this.expect(BacTokenKind.Slash, "'/' after '@' in qualified type path")) { return ''; }
+    let path = '/' + this.expectIdentifier("package segment after '@/'");
+    while (this.check(BacTokenKind.Slash)) {
+      this.advance();
+      path += '/' + this.expectIdentifier("package segment after '/'");
+    }
+    if (this.match(BacTokenKind.Dot)) {
+      path += '.' + this.expectIdentifier("object name after '.'");
+    }
+    return path;
   }
 
   // ─── Statements ──────────────────────────────────────────────────────────

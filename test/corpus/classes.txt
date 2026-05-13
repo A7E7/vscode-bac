@@ -140,3 +140,39 @@ class T : Actor {
         (class_assignment
           name: (identifier)
           value: (bool_literal))))))
+
+==================
+Class with qualified parent, interface, and var type
+==================
+
+class BP_PC : PlayerController@/Game/Foo/BP_PC implements BPI_X@/Game/Foo/BPI_X, BPI_Y {
+  var DroneRef: BP_Drone@/Game/StackOBot/Blueprints/Character/BP_Drone
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    parent_qualified_path: (qualified_path
+      (identifier)
+      (identifier)
+      (identifier))
+    interface: (identifier)
+    interface_qualified_path: (qualified_path
+      (identifier)
+      (identifier)
+      (identifier))
+    interface: (identifier)
+    body: (class_body
+      (variable_decl
+        name: (identifier)
+        type: (type_ref
+          base: (identifier)
+          qualified_path: (qualified_path
+            (identifier)
+            (identifier)
+            (identifier)
+            (identifier)
+            (identifier)))))))

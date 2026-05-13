@@ -12,6 +12,57 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Removed — BAC2240 `@replicated requires bReplicates=true`
+
+Mirrors the plugin-side removal (see
+[`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode/blob/main/CHANGELOG.md)
+for the full rationale — runtime `SetReplicates` and engine-version
+drift made the static heuristic produce too many false positives).
+
+LSP side:
+- `checkReplicationConsistency` plus `classDeclaresReplication` /
+  `decoratorImpliesReplication` helpers removed from
+  [`lsp/src/validate/contract-check.ts`](lsp/src/validate/contract-check.ts).
+- Fixture `Validate_ReplicatedWithoutClass.bac` and its
+  `parity_manifest.json` entry deleted from
+  [`test/parity-corpus/Tests/Corpus/`](test/parity-corpus/Tests/Corpus/).
+- The BAC2240 example in the code-actions comment is replaced with a
+  generic anchor-window example.
+
+Wire-stable contract note: the diagnostic code `BAC2240` is retired —
+do not reuse it for a new check. AI agents pattern-matching on the old
+semantics will silently drop the case rather than misroute.
+
+### Added — `@/Game/Path/Asset` qualifier on type-position references
+
+Optional inline qualifier disambiguating short-name collisions across
+packages. Lands atomically with the plugin-side addition (see
+`BlueprintAsCode/CHANGELOG.md` for resolver / transcriber details and
+the new `BAC2352` diagnostic).
+
+LSP / parser surface:
+- `BacTypeRef.qualifiedPath?: string` and `BacClassDecl.parentQualifiedPath`
+  / `interfaceQualifiedPaths` and `BacAssetDecl.parentQualifiedPath`
+  added to [`lsp/src/script/ast.ts`](lsp/src/script/ast.ts) — 1:1 with
+  the C++ AST changes.
+- [`lsp/src/script/parser.ts`](lsp/src/script/parser.ts) gets
+  `parseOptionalQualifiedPath()` and threads it through
+  `parseTypeRef`, `parseClassDecl` (parent + interface list), and
+  `parseAssetDecl`.
+- Formatter [`lsp/src/format/print.ts`](lsp/src/format/print.ts)
+  emits the `@path` suffix inline (no break) on types, parent class,
+  interface list, asset parent.
+- Tree-sitter [`grammar.js`](grammar.js) gets a `qualified_path` rule
+  (right-associative so the optional `.AssetName` tail is absorbed
+  into the path rather than starting a member access). `type_ref`
+  and `class_declaration` accept the qualifier in parent / interface /
+  type positions. New corpus case in
+  [`test/corpus/classes.txt`](test/corpus/classes.txt).
+
+The `@` token was already lexed (decorators use it); no token-table
+changes. Bare short names still parse as before, so the addition is
+fully backwards-compatible for existing `.bac` content.
+
 ### Added — `@override` decorator (zero-arg, function-like target)
 
 Mirrors the plugin-side addition. `.bac` now requires `@override` on
