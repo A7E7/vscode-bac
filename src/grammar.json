@@ -21,8 +21,17 @@
           }
         },
         {
-          "type": "SYMBOL",
-          "name": "class_declaration"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "class_declaration"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "interface_declaration"
+            }
+          ]
         }
       ]
     },
@@ -359,6 +368,60 @@
             "type": "SYMBOL",
             "name": "class_body"
           }
+        }
+      ]
+    },
+    "interface_declaration": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "interface"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "SYMBOL",
+            "name": "interface_body"
+          }
+        }
+      ]
+    },
+    "interface_body": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "{"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "function_decl"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "event_decl"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "}"
         }
       ]
     },
@@ -1177,6 +1240,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "reset_statement"
+        },
+        {
+          "type": "SYMBOL",
           "name": "var_decl_statement"
         },
         {
@@ -1440,6 +1507,23 @@
     "continue_statement": {
       "type": "STRING",
       "value": "continue"
+    },
+    "reset_statement": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "reset"
+        },
+        {
+          "type": "FIELD",
+          "name": "label",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        }
+      ]
     },
     "var_decl_statement": {
       "type": "PREC_RIGHT",

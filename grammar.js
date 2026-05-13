@@ -268,6 +268,7 @@ module.exports = grammar({
       $.return_statement,
       $.break_statement,
       $.continue_statement,
+      $.reset_statement,
       $.var_decl_statement,
       $.let_decl_statement,
       $.assignment_statement,
@@ -320,6 +321,17 @@ module.exports = grammar({
 
     break_statement: _ => 'break',
     continue_statement: _ => 'continue',
+
+    // `reset <label>` — wires the current exec output into the multi-exec
+    // K2Node labeled via `@<label>` elsewhere in the same class (typically
+    // a MultiGate / DoOnce whose Reset exec input is fired from another
+    // event or function). See the BAC plugin's `Roundtrip_ResetWire.bac`
+    // for the canonical shape; full semantics in the plugin's CHANGELOG
+    // under "Out-of-chain exec input wiring".
+    reset_statement: $ => seq(
+      'reset',
+      field('label', $.identifier),
+    ),
 
     var_decl_statement: $ => prec.right(seq(
       'var',

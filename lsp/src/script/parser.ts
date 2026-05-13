@@ -830,6 +830,15 @@ class Parser {
         this.advance();
         return { kind: 'continue', location };
       }
+      case BacTokenKind.Kw_Reset: {
+        // `reset <label>` — see the plugin parser for semantics. The
+        // LSP captures the syntax for highlighting / navigation but
+        // doesn't resolve the label (cross-class scope; mirror lag).
+        const location = this.current().location;
+        this.advance();
+        const targetLabel = this.expectIdentifier("identifier label after 'reset'");
+        return { kind: 'reset', location, targetLabel };
+      }
       case BacTokenKind.Kw_Var: return this.parseVarDeclStmt(true);
       case BacTokenKind.Kw_Let: return this.parseVarDeclStmt(false);
       default: return this.parseAssignOrExprStmt();

@@ -12,6 +12,37 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `reset <label>` keyword + `@<label>` multi-exec postfix (out-of-chain exec input wiring)
+
+Mirrors the plugin-side addition. `.bac` can now reference multi-exec
+K2Nodes (MultiGate, DoOnce, …) across exec chains via a class-wide
+label tag:
+
+```bac
+event OnStart() {
+  MultiGate(...)@gate { Out0() {...} Out1() {...} }
+}
+event OnReset() {
+  reset gate     // wires this exec output into gate's Reset pin
+}
+```
+
+- **Tree-sitter grammar** — new `reset_statement` rule plus `reset`
+  reserved word; new `Reset statement` corpus entry passes.
+- **LSP parser + AST** — new `BacResetStmt { kind: 'reset',
+  targetLabel: string }`; `Kw_Reset` token. The multi-exec call body
+  (`Call(...)@<label> { branches }`) still isn't fully parsed
+  LSP-side (mirror lag), but the new keyword is captured so syntax
+  highlighting / navigation work; semantic resolution happens
+  plugin-side at generate time.
+- **Formatter** (`format/print.ts`) — `reset` statement reprints as
+  `reset <label>`.
+
+See [BlueprintAsCode/CHANGELOG.md](https://github.com/A7E7/BlueprintAsCode)
+for the generator-side label registry, the transcribe-side
+auto-labeling pre-pass, and the `BAC1016` / `BAC1017` / `BAC3149`
+diagnostics.
+
 ### Added — `interface` keyword (BPTYPE_Interface authoring)
 
 `.bac` now supports a top-level `interface IFoo { … }` declaration that

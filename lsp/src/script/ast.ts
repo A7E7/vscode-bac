@@ -113,7 +113,7 @@ export type BacStmt =
   | BacBlockStmt | BacExprStmt | BacVarDeclStmt
   | BacIfStmt    | BacForStmt  | BacWhileStmt
   | BacReturnStmt | BacBreakStmt | BacContinueStmt
-  | BacAssignStmt;
+  | BacAssignStmt | BacResetStmt;
 
 interface BacStmtBase { location: BacSourceLocation }
 
@@ -150,6 +150,16 @@ export interface BacWhileStmt extends BacStmtBase {
 export interface BacReturnStmt   extends BacStmtBase { kind: 'return'; value?: BacExpr }
 export interface BacBreakStmt    extends BacStmtBase { kind: 'break'    }
 export interface BacContinueStmt extends BacStmtBase { kind: 'continue' }
+// `reset <label>` — see the BAC plugin parser for full semantics; the
+// label resolves class-wide to a multi-exec call site tagged
+// `Call(...)@<label>`. The LSP doesn't currently parse multi-exec call
+// bodies (mirror lags the plugin parser), so for now this stmt just
+// captures the syntax tree node for navigation / highlighting; semantic
+// resolution against the label happens plugin-side at generate.
+export interface BacResetStmt extends BacStmtBase {
+  kind:        'reset';
+  targetLabel: string;
+}
 export interface BacAssignStmt extends BacStmtBase {
   kind:   'assign';
   op:     BacAssignOp;

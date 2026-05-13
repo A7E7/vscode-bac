@@ -320,6 +320,7 @@ function printStmt(s: ast.BacStmt, cursor: CommentCursor): Doc {
     case 'return':   return s.value ? ['return ', printExpr(s.value)] : 'return';
     case 'break':    return 'break';
     case 'continue': return 'continue';
+    case 'reset':    return ['reset ', s.targetLabel];
     case 'assign':   return [printExpr(s.target), ' ', assignOp(s.op), ' ', printExpr(s.value)];
   }
 }

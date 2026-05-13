@@ -51,6 +51,7 @@ export enum BacTokenKind {
   Kw_Continue,
   Kw_Return,
   Kw_Await,
+  Kw_Reset,
 
   // Keywords — expression
   Kw_Super,
@@ -147,6 +148,7 @@ const KW_NAMES: Record<string, BacTokenKind> = {
   continue:     BacTokenKind.Kw_Continue,
   return:       BacTokenKind.Kw_Return,
   await:        BacTokenKind.Kw_Await,
+  reset:        BacTokenKind.Kw_Reset,
   super:        BacTokenKind.Kw_Super,
   as:           BacTokenKind.Kw_As,
   none:         BacTokenKind.Kw_None,

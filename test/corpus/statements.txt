@@ -147,3 +147,26 @@ class X : Object {
                 (call_expression
                   callee: (identifier)
                   (call_arg value: (string_literal)))))))))))
+
+==================
+Reset statement
+==================
+
+class X : Actor {
+  event OnReset() {
+    reset gate
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (event_decl
+        name: (identifier)
+        body: (block
+          (reset_statement
+            label: (identifier)))))))
