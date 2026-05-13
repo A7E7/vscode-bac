@@ -53,6 +53,8 @@ When you change code, update docs in the **same change**:
   no review gate; pushing makes work visible on GitHub for review.
 - **Don't bump the extension version or publish to a marketplace
   autonomously.** Marketplace publishes are explicit user actions.
+- **Never append a `Co-Authored-By: Claude …` trailer.** The user is the
+  sole author of record on this repo.
 
 ## Wire-stable contracts (do not break casually)
 
