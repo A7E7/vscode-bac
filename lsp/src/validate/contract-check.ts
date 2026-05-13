@@ -132,6 +132,12 @@ const ZERO_ARG_DECORATORS: DecoratorEntry[] = [
   { name: 'thread_safe',                       targetMask: TARGET_FN_LIKE },
   { name: 'unsafe_during_actor_construction',  targetMask: TARGET_FN_LIKE },
   { name: 'call_in_editor',                    targetMask: TARGET_FN_LIKE },
+  // `@override` — required intent marker for functions/events that override
+  // a parent UFunction or implement an interface method. Semantic enforcement
+  // (BAC2350 / BAC2351) is engine-coupled and runs in the C++ plugin's
+  // BacIdentifierCheck; this catalog entry only enforces shape (zero args,
+  // function-like target).
+  { name: 'override',                          targetMask: TARGET_FN_LIKE },
   // Universal (different storage per target — the appliers route correctly):
   { name: 'deprecated',                        targetMask: TARGET_ALL_DECLS },
 ];

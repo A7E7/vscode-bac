@@ -12,6 +12,29 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `@override` decorator (zero-arg, function-like target)
+
+Mirrors the plugin-side addition. `.bac` now requires `@override` on
+every function or event that overrides a parent UFunction or
+implements an interface method — same posture as the required `await`
+at latent call sites: strictly enforced, transcriber always emits.
+Aligns with TypeScript / C# / Java conventions and closes a silent
+failure mode where a typo in a function name produced a brand-new
+function instead of an override.
+
+LSP-side: `ZERO_ARG_DECORATORS` in `lsp/src/validate/contract-check.ts`
+gains an `override` entry (target = function-like). Shape validation
+(arity 0, correct target) runs in the LSP on every keystroke;
+semantic enforcement (presence iff a parent / interface member exists)
+is engine-coupled and runs in the plugin's `BacIdentifierCheck` on
+save via `bac.lint`.
+
+If you keep a local stable-code reference, add:
+- `BAC2350` — function / event overrides a parent or interface
+  member but `@override` is missing
+- `BAC2351` — `@override` decorator on a function / event with no
+  matching parent or implemented-interface member
+
 ### Added — Plugin-side `BAC2115` / `BAC2116` diagnostic codes (`@dynamic` decorator shape)
 
 Plugin mirror — the contract-pass validator now recognises the
