@@ -89,6 +89,19 @@ broken downstream agents silently. Add new codes; never reuse old ones.
 - **`.vscodeignore`** must NOT exclude `node_modules/**` — the runtime
   `vscode-languageclient` dep needs to ship inside the VSIX. `vsce` strips
   devDependencies automatically.
+- **Running tests** (run all four after any `grammar.js`,
+  `lsp/src/script/**`, `lsp/src/format/**`, or `lsp/src/validate/**` edit):
+  ```bash
+  cd lsp && npx tsc -p .              # type-check the LSP + parser port
+  npx tree-sitter generate           # regen src/parser.c after a grammar.js edit
+  npx tree-sitter test               # tree-sitter corpus (test/corpus/*.txt)
+  cd lsp && npm run parity           # LSP↔plugin diagnostic-code parity
+  ```
+  `npm run parity` auto-detects a sibling `BACSample` checkout for the
+  corpus; override with `BAC_PLUGIN_ROOT=<path>` or pass the plugin root
+  as `argv[2]`. CI uses the vendored `test/parity-corpus/` instead.
+  After a formatter change, also rebuild the standalone package:
+  `cd ../prettier-plugin-bac && node scripts/build.js`.
 
 ## When stuck
 
