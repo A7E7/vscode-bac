@@ -2568,6 +2568,10 @@
             "named": false
           },
           {
+            "type": "out",
+            "named": false
+          },
+          {
             "type": "ref",
             "named": false
           }
@@ -3566,6 +3570,10 @@
   {
     "type": "none_literal",
     "named": true
+  },
+  {
+    "type": "out",
+    "named": false
   },
   {
     "type": "pure",

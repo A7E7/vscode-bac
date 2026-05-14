@@ -184,6 +184,10 @@ export interface BacParam {
   /** `const` modifier — pin gets `CPF_ConstParm`. The BP "Const" checkbox on
    *  a parameter writes this; signals the body must not mutate the value. */
   bIsConst?:   boolean;
+  /** `out` modifier — an output parameter. Lives on the FunctionResult node,
+   *  pin gets `CPF_OutParm`. Mutually exclusive with `ref`/`const` (those
+   *  modify input params on the FunctionEntry). */
+  bIsOut?:     boolean;
 }
 
 export interface BacAssignment {

@@ -247,11 +247,14 @@ module.exports = grammar({
 
     parameter: $ => seq(
       repeat($.decorator),
-      // Optional `ref` / `const` modifiers — order is flexible. Each one
-      // sets the corresponding bit on the BP-side `FEdGraphPinType`
-      // (`bIsReference` / `bIsConst`), which UE compiles into
-      // `CPF_ReferenceParm` / `CPF_ConstParm` on the generated UFunction.
-      repeat(field('modifier', choice('ref', 'const'))),
+      // Optional `ref` / `const` / `out` modifiers — order is flexible.
+      // `ref` / `const` modify an INPUT param: they set `bIsReference` /
+      // `bIsConst` on the BP-side `FEdGraphPinType`, which UE compiles into
+      // `CPF_ReferenceParm` / `CPF_ConstParm`. `out` marks an OUTPUT param
+      // (UE `CPF_OutParm`) — a pin on the FunctionResult node. `out` is
+      // mutually exclusive with `ref` / `const`; the plugin/LSP parser
+      // rejects the combination (`BAC1041`).
+      repeat(field('modifier', choice('ref', 'const', 'out'))),
       field('name', $.identifier),
       ':',
       field('type', $.type_ref),

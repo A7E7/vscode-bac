@@ -67,6 +67,7 @@ export enum BacTokenKind {
   // Keywords — parameter modifiers
   Kw_Ref,
   Kw_Const,
+  Kw_Out,
 
   // Punctuation
   LBrace,
@@ -160,6 +161,7 @@ const KW_NAMES: Record<string, BacTokenKind> = {
   new:          BacTokenKind.Kw_New,
   ref:          BacTokenKind.Kw_Ref,
   const:        BacTokenKind.Kw_Const,
+  out:          BacTokenKind.Kw_Out,
 };
 
 export function lookupKeyword(lexeme: string): BacTokenKind {

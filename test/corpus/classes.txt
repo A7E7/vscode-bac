@@ -176,3 +176,38 @@ class BP_PC : PlayerController@/Game/Foo/BP_PC implements BPI_X@/Game/Foo/BPI_X,
             (identifier)
             (identifier)
             (identifier)))))))
+
+==================
+Function with ref / const / out parameter modifiers
+==================
+
+class X : Actor {
+  function ComputeBounds(Seed: int, ref Acc: float, const Src: Object, out Min: Vector, out Max: Vector): bool {}
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (function_decl
+        name: (identifier)
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        return_type: (type_ref base: (identifier))
+        body: (block)))))

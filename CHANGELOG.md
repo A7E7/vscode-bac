@@ -12,6 +12,29 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `out` parameter modifier (grammar change)
+
+Mirrors the plugin-side addition (see
+[`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode/blob/main/CHANGELOG.md)
+for transcribe/generate details). A new `out` parameter modifier marks a
+function **output** parameter (UE `CPF_OutParm`) — `function F(In: int, out
+Result: Vector): bool`. It replaces `ref` for the out-param role: `ref` and
+`const` now exclusively modify *input* params. `out` is mutually exclusive
+with `ref`/`const`; combining them on one param is `BAC1041`.
+
+**Grammar change** — landed in lockstep with the plugin:
+- [`grammar.js`](grammar.js) — `parameter` rule accepts `out` in the
+  modifier choice.
+- [`lsp/src/script/parser.ts`](lsp/src/script/parser.ts) /
+  [`token.ts`](lsp/src/script/token.ts) / [`ast.ts`](lsp/src/script/ast.ts)
+  — `Kw_Out` token, `BacParam.bIsOut`, the `out`+`ref`/`const` conflict
+  (`BAC1041`).
+- [`queries/highlights.scm`](queries/highlights.scm) +
+  [`bac.tmLanguage.json`](editors/code/syntaxes/bac.tmLanguage.json) — `out`
+  highlights as a keyword / storage modifier.
+- tree-sitter corpus — `test/corpus/classes.txt` covers `ref`/`const`/`out`
+  params.
+
 ### Added — `@override component` for inherited-component property overrides
 
 Mirrors the plugin-side addition (see

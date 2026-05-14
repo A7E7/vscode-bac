@@ -110,9 +110,9 @@
           "match": "\\b(attach|construction|settings|defaults)\\b"
         },
         {
-          "comment": "Parameter modifiers — `function foo(ref hp: float, const Source: Actor)`",
+          "comment": "Parameter modifiers — `function foo(ref hp: float, const Source: Actor, out Result: int)`",
           "name": "storage.modifier.bac",
-          "match": "\\b(ref|const)\\b"
+          "match": "\\b(ref|const|out)\\b"
         }
       ]
     },

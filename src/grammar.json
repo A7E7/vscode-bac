@@ -1106,6 +1106,10 @@
                 {
                   "type": "STRING",
                   "value": "const"
+                },
+                {
+                  "type": "STRING",
+                  "value": "out"
                 }
               ]
             }

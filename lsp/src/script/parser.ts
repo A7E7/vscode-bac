@@ -759,15 +759,27 @@ class Parser {
 
   private parseParam(): ast.BacParam | undefined {
     const decorators = this.parseDecorators();
-    // `ref` / `const` modifiers — order is flexible (`ref const x` and
-    // `const ref x` both parse) and either can be omitted. Mirrors the
+    // `ref` / `const` / `out` modifiers — order is flexible (`ref const x`
+    // and `const ref x` both parse) and any can be omitted. Mirrors the
     // C++ side at `BacParser.cpp::ParseParam`. Duplicates collapse
-    // silently; idempotent on the BP-side flag bits.
+    // silently; idempotent on the BP-side flag bits. `out` marks an OUTPUT
+    // param (FunctionResult); `ref`/`const` modify INPUT params
+    // (FunctionEntry) — the two roles are mutually exclusive.
     let bIsByRef = false;
     let bIsConst = false;
-    while (this.check(BacTokenKind.Kw_Ref) || this.check(BacTokenKind.Kw_Const)) {
+    let bIsOut = false;
+    while (this.check(BacTokenKind.Kw_Ref) || this.check(BacTokenKind.Kw_Const)
+        || this.check(BacTokenKind.Kw_Out)) {
       if (this.match(BacTokenKind.Kw_Ref))        { bIsByRef = true; }
       else if (this.match(BacTokenKind.Kw_Const)) { bIsConst = true; }
+      else if (this.match(BacTokenKind.Kw_Out))   { bIsOut = true; }
+    }
+    if (bIsOut && (bIsByRef || bIsConst)) {
+      this.error(
+        "'out' marks an output parameter and cannot combine with 'ref' or " +
+        "'const' (those modify input parameters).",
+        this.current().location, 'BAC1041');
+      return undefined;
     }
     const name = this.expectIdentifier('parameter name');
     if (!name) { return undefined; }
@@ -778,7 +790,7 @@ class Parser {
       const e = this.parseExpr();
       if (e) { defaultExpr = e; }
     }
-    return { name, type, decorators, default: defaultExpr, bIsByRef, bIsConst };
+    return { name, type, decorators, default: defaultExpr, bIsByRef, bIsConst, bIsOut };
   }
 
   // ─── Types ───────────────────────────────────────────────────────────────

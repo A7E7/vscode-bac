@@ -25,6 +25,7 @@
   "defaults"
   "ref"
   "const"
+  "out"
 ] @keyword
 
 [
