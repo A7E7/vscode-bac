@@ -12,6 +12,25 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `@override component` for inherited-component property overrides
+
+Mirrors the plugin-side addition (see
+[`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode/blob/main/CHANGELOG.md)
+for transcribe/generate details). A Blueprint can now round-trip
+property overrides on *inherited* components — the C++ `CharacterMesh0`
+on an `ACharacter` child, a Blueprint-parent's SCS component — via a new
+`@override component <Name>: <Type> { deltas }` decl.
+
+**Zero grammar / parser change.** `@override` is an existing decorator
+and `grammar.js` / [`lsp/src/script/parser.ts`](lsp/src/script/parser.ts)
+already accept decorators on `component` declarations — the shape parses
+today. No `grammar.js`, tree-sitter corpus, or parser-mirror update.
+
+Wire-stable contract note: new diagnostic code `BAC3039` (generator —
+`@override component <Name>` resolved to no inherited component, neither
+a native C++ CDO subobject nor a parent-chain SCS component). Add it to
+the stable-code list; never reuse it for a different check.
+
 ### Removed — BAC2240 `@replicated requires bReplicates=true`
 
 Mirrors the plugin-side removal (see
