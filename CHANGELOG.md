@@ -12,6 +12,38 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `timeline X { … }` and `track` keywords (grammar change)
+
+Lockstep with the plugin-side
+[`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode/blob/main/CHANGELOG.md)
+`[Unreleased]` "Timeline declaration syntax" entry. Two new reserved
+keywords (`timeline`, `track`); one new class-body member
+(`timeline_decl`) carrying settings, tracks, and handler events.
+
+**Grammar change** — landed in lockstep with the plugin:
+- [`grammar.js`](grammar.js) — `_class_member` accepts `timeline_decl`;
+  new `timeline_decl`, `timeline_setting`, and `track_decl` rules.
+- [`test/corpus/classes.txt`](test/corpus/classes.txt) — tree-sitter
+  corpus entry "Timeline with settings, tracks, and handlers".
+- [`lsp/src/script/token.ts`](lsp/src/script/token.ts) — new
+  `BacTokenKind.Kw_Timeline` / `Kw_Track`; `KW_NAMES` entries.
+- [`lsp/src/script/ast.ts`](lsp/src/script/ast.ts) — `BacTimelineDecl`
+  and `BacTrackDecl` interfaces; `BacMember` union extended.
+- [`lsp/src/script/parser.ts`](lsp/src/script/parser.ts) — class-body
+  dispatch + `parseTimelineDecl`; settings / track / handler interleave.
+- [`lsp/src/navigation/hover.ts`](lsp/src/navigation/hover.ts) — hover
+  card for `timeline` members.
+- [`lsp/src/validate/contract-check.ts`](lsp/src/validate/contract-check.ts) —
+  member-target mapping (timelines accept no decorators in slice 1).
+
+**Diagnostic codes** mirrored from the plugin's *Diagnostic code
+namespaces* table: `BAC2240`–`BAC2246` (contract: duplicate timeline
+name, unsupported track type, duplicate track name, duplicate handler,
+non-Update handler with params, unknown handler name, Update param not
+a declared data track). These don't fire from the TS side yet — they're
+plugin-coupled — but the codes are reserved so the LSP doesn't need to
+renumber when it picks them up.
+
 ### Added — `out` parameter modifier (grammar change)
 
 Mirrors the plugin-side addition (see

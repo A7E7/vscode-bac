@@ -211,3 +211,46 @@ class X : Actor {
           type: (type_ref base: (identifier)))
         return_type: (type_ref base: (identifier))
         body: (block)))))
+
+==================
+Timeline with settings, tracks, and handlers
+==================
+
+class BP_Coin : Actor {
+  timeline ShowPickup {
+    Length = 0.5
+    track Coin: float = asset("/Game/Curves/CV_Coin.CV_Coin")
+    track Pulse
+    event Update(Coin: float) {}
+    event Finished() {}
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (timeline_decl
+        name: (identifier)
+        (timeline_setting
+          name: (identifier)
+          value: (float_literal))
+        (track_decl
+          name: (identifier)
+          type: (type_ref base: (identifier))
+          source: (asset_expression
+            path: (string_literal)))
+        (track_decl
+          name: (identifier))
+        (event_decl
+          name: (identifier)
+          (parameter
+            name: (identifier)
+            type: (type_ref base: (identifier)))
+          body: (block))
+        (event_decl
+          name: (identifier)
+          body: (block))))))

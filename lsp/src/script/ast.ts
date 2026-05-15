@@ -203,7 +203,8 @@ export interface BacAssignment {
 export type BacMember =
   | BacVariableDecl | BacComponentDecl | BacFunctionDecl
   | BacEventDecl    | BacConstructionDecl | BacWidgetDecl
-  | BacMacroDecl    | BacDefaultsBlock   | BacSettingsBlock;
+  | BacMacroDecl    | BacDefaultsBlock   | BacSettingsBlock
+  | BacTimelineDecl;
 
 interface BacMemberBase {
   location:   BacSourceLocation;
@@ -279,6 +280,34 @@ export interface BacDefaultsBlock extends BacMemberBase {
 export interface BacSettingsBlock extends BacMemberBase {
   kind:        'settings';
   assignments: BacAssignment[];
+}
+
+/**
+ * `track <Name>[: Type [= Source]]` inside a timeline body.
+ * Type-less tracks are event tracks; otherwise the type is `float`,
+ * `Vector`, or `LinearColor` and Source resolves to a UCurveBase
+ * subclass (external asset or inline subobject).
+ */
+export interface BacTrackDecl {
+  name:     string;
+  type?:    BacTypeRef;
+  source?:  BacExpr;
+  location: BacSourceLocation;
+}
+
+/**
+ * `timeline X { settings; tracks; handlers }` — a UTimelineTemplate
+ * plus the single K2Node_Timeline that binds it (slice-1 single-
+ * instance assumption). Settings target scalar fields on the template
+ * (Length, LengthMode, AutoPlay, …); handlers wire into the
+ * K2Node_Timeline's exec output pins (Update / Finished / per-event-track).
+ */
+export interface BacTimelineDecl extends BacMemberBase {
+  kind:     'timeline';
+  name:     string;
+  settings: BacAssignment[];
+  tracks:   BacTrackDecl[];
+  handlers: BacEventDecl[];
 }
 
 // ─── Top level ──────────────────────────────────────────────────────────────

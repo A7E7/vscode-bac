@@ -475,9 +475,10 @@ class Parser {
       case BacTokenKind.Kw_Macro:        return this.parseMacroDecl(decorators);
       case BacTokenKind.Kw_Defaults:     return this.parseDefaultsBlock(decorators);
       case BacTokenKind.Kw_Settings:     return this.parseSettingsBlock(decorators);
+      case BacTokenKind.Kw_Timeline:     return this.parseTimelineDecl(decorators);
       default: {
         this.error(
-          `Expected class member (var, component, function, event, construction, widget, macro, defaults, settings) but got '${tokenKindName(this.current().kind)}'.`,
+          `Expected class member (var, component, function, event, construction, widget, animation, timeline, macro, defaults, settings) but got '${tokenKindName(this.current().kind)}'.`,
           this.current().location, 'BAC1021');
         return undefined;
       }
@@ -684,6 +685,73 @@ class Parser {
     this.advance(); // 'construction'
     const body = this.parseBlock();
     return { kind: 'construction', location, decorators, body };
+  }
+
+  // `timeline X { settings; tracks; handlers }`. Body interleaves three
+  // line shapes (newline- or semicolon-terminated):
+  //   • `Name = Expr`                — setting (Length, LengthMode, AutoPlay, …)
+  //   • `track Name[: Type [= Src]]` — track decl (event track when no type)
+  //   • `event Name(params) { body }` — handler bound to an exec output
+  private parseTimelineDecl(decorators: ast.BacDecorator[]): ast.BacTimelineDecl {
+    const out: ast.BacTimelineDecl = {
+      kind: 'timeline', location: this.current().location, decorators,
+      name: '', settings: [], tracks: [], handlers: [],
+    };
+    this.advance(); // 'timeline'
+    out.name = this.expectIdentifier('timeline name');
+    if (!out.name) { return out; }
+    if (!this.expect(BacTokenKind.LBrace, "'{' to open timeline body")) { return out; }
+
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+
+      if (this.check(BacTokenKind.Kw_Event)) {
+        const ev = this.parseEventDecl([]);
+        out.handlers.push(ev);
+        this.skipNewlines();
+        continue;
+      }
+
+      if (this.check(BacTokenKind.Kw_Track)) {
+        const trackLoc = this.current().location;
+        this.advance(); // 'track'
+        const name = this.expectIdentifier('track name');
+        if (!name) { this.syncToMemberOrEnd(); continue; }
+        const track: ast.BacTrackDecl = { name, location: trackLoc };
+        if (this.match(BacTokenKind.Colon)) {
+          track.type = this.parseTypeRef();
+          if (this.match(BacTokenKind.Assign)) {
+            track.source = this.parseExpr() ?? undefined;
+          }
+        }
+        out.tracks.push(track);
+        this.skipNewlines();
+        continue;
+      }
+
+      if (this.check(BacTokenKind.Identifier)) {
+        const settingLoc = this.current().location;
+        const name = this.expectAssignmentName('timeline setting name');
+        if (!name) { this.syncToMemberOrEnd(); continue; }
+        if (!this.expect(BacTokenKind.Assign, "'=' after timeline setting name")) {
+          this.syncToMemberOrEnd();
+          continue;
+        }
+        const value = this.parseExpr();
+        if (!value) { break; }
+        out.settings.push({ name, value, location: settingLoc });
+        this.skipNewlines();
+        continue;
+      }
+
+      this.error(
+        `Unexpected token '${tokenKindName(this.current().kind)}' in timeline body — expected setting, 'track', or 'event'.`,
+        this.current().location, 'BAC1027');
+      this.advance();
+    }
+    this.expect(BacTokenKind.RBrace, "'}' to close timeline body");
+    return out;
   }
 
   // `widget Name: Type { Body }` at the class top level. Body holds two

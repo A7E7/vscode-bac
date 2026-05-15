@@ -147,6 +147,7 @@ module.exports = grammar({
       $.construction_decl,
       $.defaults_block,
       $.settings_block,
+      $.timeline_decl,
     ),
 
     // `defaults { Property = Value … }` — class-scope CDO overrides. Each
@@ -243,6 +244,41 @@ module.exports = grammar({
       repeat($.decorator),
       'construction',
       field('body', $.block),
+    ),
+
+    // `timeline X { setting = expr; track Name[: Type [= Source]]; event H() {} }`
+    // — a UTimelineTemplate + its associated K2Node_Timeline. Settings target
+    // scalar fields on the template (Length, LengthMode, AutoPlay, …); tracks
+    // are data tracks (float / Vector / LinearColor with a curve source) or
+    // bare event tracks; handlers (Update / Finished / per-event-track)
+    // bind to the K2Node_Timeline's exec output pins.
+    timeline_decl: $ => seq(
+      repeat($.decorator),
+      'timeline',
+      field('name', $.identifier),
+      '{',
+      repeat(choice(
+        $.timeline_setting,
+        $.track_decl,
+        $.event_decl,
+      )),
+      '}',
+    ),
+
+    timeline_setting: $ => seq(
+      field('name', $.identifier),
+      '=',
+      field('value', $._expression),
+    ),
+
+    track_decl: $ => seq(
+      'track',
+      field('name', $.identifier),
+      optional(seq(
+        ':',
+        field('type', $.type_ref),
+        optional(seq('=', field('source', $._expression))),
+      )),
     ),
 
     parameter: $ => seq(

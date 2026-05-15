@@ -40,6 +40,8 @@ export enum BacTokenKind {
   Kw_Struct,
   Kw_Table,
   Kw_Row,
+  Kw_Timeline,
+  Kw_Track,
 
   // Keywords — control flow
   Kw_If,
@@ -140,6 +142,8 @@ const KW_NAMES: Record<string, BacTokenKind> = {
   struct:       BacTokenKind.Kw_Struct,
   table:        BacTokenKind.Kw_Table,
   row:          BacTokenKind.Kw_Row,
+  timeline:     BacTokenKind.Kw_Timeline,
+  track:        BacTokenKind.Kw_Track,
   if:           BacTokenKind.Kw_If,
   else:         BacTokenKind.Kw_Else,
   for:          BacTokenKind.Kw_For,

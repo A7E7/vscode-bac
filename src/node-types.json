@@ -1024,6 +1024,10 @@
           "named": true
         },
         {
+          "type": "timeline_decl",
+          "named": true
+        },
+        {
           "type": "variable_decl",
           "named": true
         }
@@ -2874,6 +2878,250 @@
     }
   },
   {
+    "type": "timeline_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "decorator",
+          "named": true
+        },
+        {
+          "type": "event_decl",
+          "named": true
+        },
+        {
+          "type": "timeline_setting",
+          "named": true
+        },
+        {
+          "type": "track_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "timeline_setting",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "asset_expression",
+            "named": true
+          },
+          {
+            "type": "await_expression",
+            "named": true
+          },
+          {
+            "type": "binary_expression",
+            "named": true
+          },
+          {
+            "type": "bool_literal",
+            "named": true
+          },
+          {
+            "type": "call_expression",
+            "named": true
+          },
+          {
+            "type": "cast_expression",
+            "named": true
+          },
+          {
+            "type": "default_expression",
+            "named": true
+          },
+          {
+            "type": "float_literal",
+            "named": true
+          },
+          {
+            "type": "generic_call_expression",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "index_expression",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "member_access_expression",
+            "named": true
+          },
+          {
+            "type": "none_literal",
+            "named": true
+          },
+          {
+            "type": "parenthesized_expression",
+            "named": true
+          },
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "super_expression",
+            "named": true
+          },
+          {
+            "type": "this_expression",
+            "named": true
+          },
+          {
+            "type": "unary_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "track_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "source": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "asset_expression",
+            "named": true
+          },
+          {
+            "type": "await_expression",
+            "named": true
+          },
+          {
+            "type": "binary_expression",
+            "named": true
+          },
+          {
+            "type": "bool_literal",
+            "named": true
+          },
+          {
+            "type": "call_expression",
+            "named": true
+          },
+          {
+            "type": "cast_expression",
+            "named": true
+          },
+          {
+            "type": "default_expression",
+            "named": true
+          },
+          {
+            "type": "float_literal",
+            "named": true
+          },
+          {
+            "type": "generic_call_expression",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "index_expression",
+            "named": true
+          },
+          {
+            "type": "integer_literal",
+            "named": true
+          },
+          {
+            "type": "member_access_expression",
+            "named": true
+          },
+          {
+            "type": "none_literal",
+            "named": true
+          },
+          {
+            "type": "parenthesized_expression",
+            "named": true
+          },
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "super_expression",
+            "named": true
+          },
+          {
+            "type": "this_expression",
+            "named": true
+          },
+          {
+            "type": "unary_expression",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "type_ref",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "type_ref",
     "named": true,
     "fields": {
@@ -3602,6 +3850,14 @@
   {
     "type": "this_expression",
     "named": true
+  },
+  {
+    "type": "timeline",
+    "named": false
+  },
+  {
+    "type": "track",
+    "named": false
   },
   {
     "type": "true",

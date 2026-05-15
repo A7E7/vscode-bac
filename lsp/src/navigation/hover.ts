@@ -269,6 +269,14 @@ function formatClassMember(m: ast.BacMember): string {
       const n = m.assignments.length;
       return `\`settings\` block (${n} class setting${n === 1 ? '' : 's'})`;
     }
+    case 'timeline': {
+      const t = m.tracks.length;
+      const h = m.handlers.length;
+      return [
+        `\`timeline\` **${m.name}** (${t} track${t === 1 ? '' : 's'}, ${h} handler${h === 1 ? '' : 's'})`,
+        decoratorsBlock,
+      ].filter(Boolean).join('\n');
+    }
   }
 }
 

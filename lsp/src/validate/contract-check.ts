@@ -64,6 +64,9 @@ function memberToTarget(k: ast.BacMember['kind']): Target {
     case 'macro':        return 'macro';
     case 'defaults':     return 'defaults';
     case 'settings':     return 'settings';
+    // Timelines accept zero decorators in slice 1; fold into a neutral
+    // target so the decorator-mismatch catalog never triggers on them.
+    case 'timeline':     return 'class';
   }
 }
 
