@@ -12,6 +12,40 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Plugin-side fixes — lockstep awareness (no wire changes)
+
+The following plugin-side fixes landed without touching any wire-stable
+contract (no grammar / parser / diagnostic / NDJSON / `bac.lint`
+changes). Listed here only so the diagnostic-code stable list stays
+accurate and the changelog reflects what users see on the next plugin
+release:
+
+- **`K2Node_Self` subobject class stamping** — generator now sets the
+  BPGC on the K2Node_Self output pin's `PinSubCategoryObject` so
+  `self` passed to a typed BP-class parameter compiles against a
+  transient-package BP (the duplicate-and-regenerate harness flow).
+- **Non-overridable parent UFUNCTION cleanup extended** — the
+  generator's existing `BAC3082` collision-skip now also purges stale
+  `UK2Node_Event` nodes (was previously `UK2Node_CustomEvent`-only).
+  Real-asset case: `APlayerController::Pause` on a legacy BP_PC_Stack.
+- **Override-event claim rebinds** — when claiming an existing
+  `UK2Node_Event` by name, the generator now re-applies
+  `SetFromField<UFunction>` with the resolved override's owner class
+  so the claimed node's `MemberParentClass` matches the resolver's
+  pick (vs the saved-but-stale value).
+- **Transcriber `@override` drop on non-placeable-as-event refs** —
+  emits the event as a custom event (no `@override`) when the BP-side
+  `EventReference` resolves to a function that's no longer placeable
+  as event in current UE (via `UEdGraphSchema_K2::FunctionCanBePlacedAsEvent`).
+- **Timeline lookup sanitize-fallback** — generator now reverse-resolves
+  spaceful `UTimelineTemplate::VariableName` (e.g. `Hide Hologram`) via
+  `MakeIdentifier` so the regen reuses the existing template +
+  `K2Node_Timeline` instead of orphaning them next to sanitised twins.
+- **`BAC3052` (harness-only)** — new code reserved for the AI-diff
+  harness's cross-BP self-ref class-identity downgrade. Not wire-stable
+  per `AI_DIFF_HARNESS.md`; listed for stable-code-list bookkeeping
+  only — never emitted by `bac.lint`, never reaches the LSP.
+
 ### Added — Inline curve subobjects on `track <Name>: <Type> = data<CurveType>("…")`
 
 Lockstep with the plugin-side
