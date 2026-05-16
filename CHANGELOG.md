@@ -12,6 +12,35 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — Inline curve subobjects on `track <Name>: <Type> = data<CurveType>("…")`
+
+Lockstep with the plugin-side
+[`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode/blob/main/CHANGELOG.md)
+"Inline curve subobjects round-trip" entry (timeline slice 2).
+BP-local `UCurveFloat` / `UCurveVector` / `UCurveLinearColor` subobjects
+parented to a timeline now round-trip via the existing `data<T>("…")`
+universal-escape — the inner string is a reflective `(Prop=Val,…)`
+payload that the plugin imports through `FProperty::ImportText` on the
+allocated curve subobject. Static arrays (`UCurveVector::FloatCurves[3]`
+/ `UCurveLinearColor::FloatCurves[4]`) carry their per-element values as
+`Prop[Index]=Val` pairs.
+
+**Zero grammar / parser change.** `data<T>("…")` is an existing
+expression-position shape (the universal opaque-literal escape, e.g.
+`data<FRichCurve>("(Keys=…)")`); the inline-curve carrier reuses it
+unchanged. No `grammar.js`, tree-sitter corpus, parser-mirror, or
+keyword update needed — the LSP highlights / completes / formats inline
+curves identically to every other `data<>` payload.
+
+**Wire-stable contract note:** two new plugin-side diagnostic codes
+mirrored into the stable-code list: `BAC3094` (inline-curve payload
+references an unknown property name or out-of-range static-array
+index) and `BAC3095` (inline-curve payload is malformed — missing
+`=`, unbalanced parens, or `ImportText` rejected the per-property
+value). Neither fires from the TS side — they're plugin-coupled —
+but the codes are reserved so the LSP doesn't need to renumber when
+it picks them up.
+
 ### Added — `timeline X { … }` and `track` keywords (grammar change)
 
 Lockstep with the plugin-side
