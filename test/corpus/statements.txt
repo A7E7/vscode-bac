@@ -170,3 +170,44 @@ class X : Actor {
         body: (block
           (reset_statement
             label: (identifier)))))))
+
+==================
+Member access — dot and colon-colon separators
+==================
+
+class X : Actor {
+  event Y() {
+    let a: int = Enum_State::Idle
+    let b: int = some.field
+    let c: int = PrimaryThumbstick::Axis_X
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (event_decl
+        name: (identifier)
+        body: (block
+          (let_decl_statement
+            name: (identifier)
+            type: (type_ref base: (identifier))
+            initializer: (member_access_expression
+              target: (identifier)
+              member: (identifier)))
+          (let_decl_statement
+            name: (identifier)
+            type: (type_ref base: (identifier))
+            initializer: (member_access_expression
+              target: (identifier)
+              member: (identifier)))
+          (let_decl_statement
+            name: (identifier)
+            type: (type_ref base: (identifier))
+            initializer: (member_access_expression
+              target: (identifier)
+              member: (identifier))))))))

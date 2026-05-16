@@ -16,6 +16,7 @@ export function runReferenceCheck(scriptAst: ast.BacScriptAst, out: BacDiagnosti
   checkAttachCycles(cls, symbols, out);
   checkRepNotifyRefs(cls, symbols, out);
   checkLocalScopes(cls, out);
+  checkCrossEventRefs(cls, symbols, out);
 }
 
 // ─── Class-level symbol tables ─────────────────────────────────────────────
@@ -273,6 +274,105 @@ function checkLocalScopes(cls: ast.BacClassDecl, out: BacDiagnostics): void {
       case 'construction': checkParamsAndBody('Construction', '(construction)', m.location, [], m.body, out); break;
       default: break;
     }
+  }
+}
+
+// ─── Cross-event pin references (BAC2360 / BAC2361) ───────────────────────
+//
+// `EventName::PinName` resolves to an output pin of another event/function
+// in the same class. The blueprint runtime captures the LAST value the
+// source event fired with — so the consumer reads stale data whenever the
+// source hasn't recently fired. We allow the construct (Epic's StackOBot
+// uses it) but emit a warning so the staleness isn't silent.
+//
+// TS sees only the in-class members; it can't tell a `Foo::Bar` apart from
+// an enum literal when `Foo` is an unknown name. We therefore only emit
+// when `Foo` resolves to an in-class event/function. The engine-coupled
+// C++ pass covers the enum vs unknown-event discrimination.
+function checkCrossEventRefs(cls: ast.BacClassDecl, sym: ClassSymbols, out: BacDiagnostics): void {
+  for (const m of cls.members) {
+    switch (m.kind) {
+      case 'function':
+      case 'event':
+      case 'macro':
+        visitCrossEventInBlock(m.body, sym, out);
+        break;
+      case 'construction':
+        visitCrossEventInBlock(m.body, sym, out);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+function visitCrossEventInBlock(b: ast.BacBlockStmt | undefined, sym: ClassSymbols, out: BacDiagnostics): void {
+  if (!b) { return; }
+  for (const s of b.statements) { visitCrossEventInStmt(s, sym, out); }
+}
+
+function visitCrossEventInStmt(s: ast.BacStmt, sym: ClassSymbols, out: BacDiagnostics): void {
+  switch (s.kind) {
+    case 'block':    return visitCrossEventInBlock(s, sym, out);
+    case 'expr':     return visitCrossEventInExpr(s.expr, sym, out);
+    case 'var_decl': if (s.initializer) { visitCrossEventInExpr(s.initializer, sym, out); } return;
+    case 'if': {
+      visitCrossEventInExpr(s.condition, sym, out);
+      visitCrossEventInBlock(s.then, sym, out);
+      if (s.else) { visitCrossEventInStmt(s.else, sym, out); }
+      return;
+    }
+    case 'for':      visitCrossEventInExpr(s.iterable, sym, out); visitCrossEventInBlock(s.body, sym, out); return;
+    case 'while':    visitCrossEventInExpr(s.condition, sym, out); visitCrossEventInBlock(s.body, sym, out); return;
+    case 'return':   if (s.value) { visitCrossEventInExpr(s.value, sym, out); } return;
+    case 'assign':   visitCrossEventInExpr(s.target, sym, out); visitCrossEventInExpr(s.value, sym, out); return;
+    default:         return;  // break / continue / reset have no nested exprs
+  }
+}
+
+function visitCrossEventInExpr(e: ast.BacExpr, sym: ClassSymbols, out: BacDiagnostics): void {
+  switch (e.kind) {
+    case 'member_access': {
+      visitCrossEventInExpr(e.target, sym, out);
+      if (e.separator !== '::')   { return; }
+      if (e.target.kind !== 'ident') { return; }
+      const lhsName = e.target.name;
+      const member = sym.allMembersByName.get(lhsName);
+      if (!member) { return; }   // unknown LHS — could be enum, defer to C++
+      if (member.kind !== 'event' && member.kind !== 'function') { return; }
+      const pinName = e.memberName;
+      const pin = member.params.find(p => p.name === pinName);
+      if (pin) {
+        out.items.push({
+          severity: 'warning',
+          code:     'BAC2360',
+          location: e.location,
+          message:  `Cross-event reference '${lhsName}::${pinName}': captures the last value of '${lhsName}'s output '${pinName}'. Only updated when '${lhsName}' actually fires — stale otherwise.`,
+          notes:    [{ message: `${member.kind} declared here`, location: member.location }],
+        });
+      } else {
+        const candidates = member.params.map(p => p.name);
+        const suggestion = closestMatch(pinName, candidates);
+        out.items.push({
+          severity: 'error',
+          code:     'BAC2361',
+          location: e.location,
+          message:  suggestion
+            ? `'${pinName}' is not an output parameter of ${member.kind} '${lhsName}'. Did you mean '${suggestion}'?`
+            : `'${pinName}' is not an output parameter of ${member.kind} '${lhsName}'.`,
+          notes:    [{ message: `${member.kind} declared here`, location: member.location }],
+        });
+      }
+      return;
+    }
+    case 'index':        visitCrossEventInExpr(e.target, sym, out); visitCrossEventInExpr(e.index, sym, out); return;
+    case 'call':         visitCrossEventInExpr(e.callee, sym, out); for (const a of e.args) { visitCrossEventInExpr(a.value, sym, out); } return;
+    case 'generic_call': visitCrossEventInExpr(e.callee, sym, out); for (const a of e.args) { visitCrossEventInExpr(a.value, sym, out); } return;
+    case 'binary':       visitCrossEventInExpr(e.left, sym, out); visitCrossEventInExpr(e.right, sym, out); return;
+    case 'unary':        visitCrossEventInExpr(e.operand, sym, out); return;
+    case 'cast':         visitCrossEventInExpr(e.source, sym, out); return;
+    case 'await':        visitCrossEventInExpr(e.inner, sym, out); return;
+    default:             return;  // literals, this, super, ident, asset, default
   }
 }
 

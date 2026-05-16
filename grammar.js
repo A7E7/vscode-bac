@@ -498,7 +498,7 @@ module.exports = grammar({
 
     member_access_expression: $ => prec('member_access', seq(
       field('target', $._expression),
-      '.',
+      field('separator', choice('.', '::')),
       field('member', $.identifier),
     )),
 

@@ -12,6 +12,41 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — cross-event pin references (`EventName::PinName`) — grammar / AST / validator (wire change)
+
+Coordinates with the plugin-side change documented in
+`BlueprintAsCode/CHANGELOG.md` (same release window). Wire-stable items
+that moved:
+
+- **Tree-sitter grammar** — `member_access_expression` now accepts `::`
+  alongside `.`. The handwritten parser already accepted `::` for enum
+  literals but tree-sitter was silently dropping the form; the corpus
+  test in `test/corpus/statements.txt` exercises both separators.
+- **`BacMemberAccessExpr` AST** — new `separator: '.' | '::'` field
+  preserved end-to-end. The handwritten parser at `lsp/src/script/parser.ts`
+  stops collapsing `::` into `.` (the previous behaviour was a deliberate
+  simplification documented at the call site); the formatter at
+  `lsp/src/format/print.ts` now round-trips the original separator
+  faithfully (was unconditionally `.` before, which silently rewrote
+  `Enum_X::Y` to `Enum_X.Y` on save).
+- **New diagnostic codes** added to the wire-stable list:
+  - **BAC2360** (warning) — cross-event pin reference; the source's
+    output is captured at the source event's last fire, so consumers
+    read stale data otherwise. Message includes hint to promote to a
+    shared variable if fresh data is needed.
+  - **BAC2361** (error) — `Event::Pin` where the LHS is unknown or the
+    pin doesn't exist on the named event.
+  - **BAC2362** (error) — event/function name shadows a known UEnum
+    short name. Per the resolution rule, enum literals win at `::`, so
+    the event would be unreachable as `EAxis::SomePin`; the validator
+    forces a rename at the event decl. (LSP-side TS port covers BAC2360
+    and BAC2361 for in-class event LHS resolution; BAC2362 requires the
+    UEnum registry and is C++-side only — engine-coupled like other
+    BAC23xx identifier-pass codes.)
+- **Parity fixtures** added under
+  `Tests/Corpus/Validate_CrossEventRef{Ok,UnknownPin,UnknownEvent,EnumShadow}.bac`
+  with matching `parity_manifest.json` entries.
+
 ### Plugin-side fixes — lockstep awareness (no wire changes)
 
 The following plugin-side fixes landed without touching any wire-stable

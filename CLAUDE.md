@@ -62,7 +62,7 @@ These are consumed by AI agents, CI pipelines, and the plugin. Changes must
 ship in both this repo and the plugin atomically:
 
 - Diagnostic JSON shape from `--once` and `--once-no-engine`
-- Diagnostic codes (`BAC1xxx`, `BAC22xx`, `BAC23xx`, `BAC2310/2311`, `BAC2330`)
+- Diagnostic codes (`BAC1xxx`, `BAC22xx`, `BAC23xx`, `BAC2310/2311`, `BAC2330`, `BAC2360/2361/2362` cross-event references)
 - Completion server NDJSON protocol (`{op, ...}` request, `{ok, result|error}` response)
 - Endpoint discovery file path (`<ProjectDir>/Saved/BacEditorEndpoint.json`) and shape
 

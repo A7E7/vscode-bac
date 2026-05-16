@@ -66,6 +66,10 @@ export interface BacMemberAccessExpr extends BacExprBase {
   kind:       'member_access';
   target:     BacExpr;
   memberName: string;
+  // '.' is property/struct member access on a value.
+  // '::' is namespace access — enum literal (Enum_X::Y) or
+  // cross-event pin reference (PrimaryThumbstick::Axis_X).
+  separator:  '.' | '::';
 }
 export interface BacIndexExpr extends BacExprBase {
   kind:   'index';

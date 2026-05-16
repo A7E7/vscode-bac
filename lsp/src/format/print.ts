@@ -396,7 +396,7 @@ function printExpr(e: ast.BacExpr): Doc {
     case 'await':         return ['await ', printExpr(e.inner)];
     case 'unary':         return [unaryOp(e.op), printExpr(e.operand)];
     case 'cast':          return [printExpr(e.source), ' as ', printType(e.targetType)];
-    case 'member_access': return [printExpr(e.target), '.', e.memberName];
+    case 'member_access': return [printExpr(e.target), e.separator, e.memberName];
     case 'index':         return [printExpr(e.target), '[', printExpr(e.index), ']'];
     case 'call':          return printCall(e);
     case 'generic_call':  return printGenericCall(e);
