@@ -148,6 +148,7 @@ module.exports = grammar({
       $.defaults_block,
       $.settings_block,
       $.timeline_decl,
+      $.widget_decl,
     ),
 
     // `defaults { Property = Value … }` — class-scope CDO overrides. Each
@@ -268,6 +269,61 @@ module.exports = grammar({
     timeline_setting: $ => seq(
       field('name', $.identifier),
       '=',
+      field('value', $._expression),
+    ),
+
+    // UMG widget tree. Top-level form carries the `widget` keyword; the
+    // body recursively contains:
+    //   • static property overrides — `Name = expr`
+    //   • UMG property bindings — `Name => Func` (the `=>` is the
+    //     FatArrow token; plugin lowers it to `WBP->Bindings`)
+    //   • child widgets — `Name: Type [{ body }]` (keyword-less, brace
+    //     body optional for leaf widgets)
+    // Mirrors `parseWidgetDecl` / `parseChildWidgetDecl` / `parseWidgetBody`
+    // in `lsp/src/script/parser.ts` (lines 763-826) and `ParseWidgetDecl`
+    // in the C++ plugin's `BacParser.cpp`.
+    widget_decl: $ => seq(
+      repeat($.decorator),
+      'widget',
+      field('name', $.identifier),
+      ':',
+      field('type', $.type_ref),
+      field('body', $.widget_body),
+    ),
+
+    widget_body: $ => seq(
+      '{',
+      repeat(choice(
+        $.widget_binding,
+        $.widget_assignment,
+        $.child_widget_decl,
+      )),
+      '}',
+    ),
+
+    child_widget_decl: $ => seq(
+      field('name', $.identifier),
+      ':',
+      field('type', $.type_ref),
+      optional(field('body', $.widget_body)),
+    ),
+
+    // `Name = expr` — static property override applied by the generator
+    // via FProperty::ImportText. LHS permits a dotted path so `Slot.X`
+    // routes the override to the widget's UPanelSlot.
+    widget_assignment: $ => seq(
+      field('name', sep1($.identifier, '.')),
+      '=',
+      field('value', $._expression),
+    ),
+
+    // `Name => FuncOrVar` — UMG property binding. Generator stamps a
+    // FDelegateEditorBinding on the WidgetBlueprint and (for variable
+    // RHS) synthesises a thin `__bac_bind_<Var>` pure wrapper that the
+    // transcriber unwraps on round-trip.
+    widget_binding: $ => seq(
+      field('name', sep1($.identifier, '.')),
+      '=>',
       field('value', $._expression),
     ),
 

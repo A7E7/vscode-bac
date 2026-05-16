@@ -1,0 +1,96 @@
+==================
+Widget with binding (function RHS)
+==================
+
+class W : UserWidget {
+  widget Root: TextBlock {
+    Text => GetText
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (widget_decl
+        name: (identifier)
+        type: (type_ref base: (identifier))
+        body: (widget_body
+          (widget_binding
+            name: (identifier)
+            value: (identifier)))))))
+
+==================
+Widget with binding (variable RHS), static override, and child
+==================
+
+class W : UserWidget {
+  var bIsActive: bool = true
+  widget Root: CanvasPanel {
+    StartButton: Button {
+      bIsEnabled => bIsActive
+      Padding = 4
+    }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (variable_decl
+        name: (identifier)
+        type: (type_ref base: (identifier))
+        default: (bool_literal))
+      (widget_decl
+        name: (identifier)
+        type: (type_ref base: (identifier))
+        body: (widget_body
+          (child_widget_decl
+            name: (identifier)
+            type: (type_ref base: (identifier))
+            body: (widget_body
+              (widget_binding
+                name: (identifier)
+                value: (identifier))
+              (widget_assignment
+                name: (identifier)
+                value: (integer_literal)))))))))
+
+==================
+Child widget with dotted Slot.X static override
+==================
+
+class W : UserWidget {
+  widget Root: CanvasPanel {
+    Label: TextBlock {
+      Slot.ZOrder = 1
+    }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (widget_decl
+        name: (identifier)
+        type: (type_ref base: (identifier))
+        body: (widget_body
+          (child_widget_decl
+            name: (identifier)
+            type: (type_ref base: (identifier))
+            body: (widget_body
+              (widget_assignment
+                name: (identifier)
+                name: (identifier)
+                value: (integer_literal)))))))))

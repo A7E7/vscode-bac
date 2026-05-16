@@ -24,6 +24,7 @@ import * as path from 'node:path';
 import { tokenize } from '../script/lexer';
 import { parse } from '../script/parser';
 import { BacDiagnostics } from '../script/diagnostics';
+import { runBindingCheck } from './binding-check';
 import { runContractCheck } from './contract-check';
 import { runReferenceCheck } from './reference-check';
 import { runTypeCheck } from './type-check';
@@ -111,6 +112,7 @@ function runOne(pluginRoot: string, entry: ManifestEntry): RunResult {
   const ast = parse(tokens, diags);
   runContractCheck(ast, diags);
   runReferenceCheck(ast, diags);
+  runBindingCheck(ast, diags);
   runTypeCheck(ast, diags);
 
   const mismatches: string[] = [];

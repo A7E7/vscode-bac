@@ -157,6 +157,10 @@ const KW_NAMES: Record<string, BacTokenKind> = {
   super:        BacTokenKind.Kw_Super,
   as:           BacTokenKind.Kw_As,
   none:         BacTokenKind.Kw_None,
+  // BP's `FName::None` round-trips into the transcriber's emitted .bac
+  // capitalised — accept both forms so transcribed scripts parse without
+  // a separate case-fix step. Mirrors `BacLexer.cpp` (`BAC_KW("None", Kw_None)`).
+  None:         BacTokenKind.Kw_None,
   true:         BacTokenKind.Kw_True,
   false:        BacTokenKind.Kw_False,
   default:      BacTokenKind.Kw_Default,

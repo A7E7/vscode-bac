@@ -36,6 +36,7 @@ import * as crypto from 'node:crypto';
 import { tokenize } from './script/lexer';
 import { parse } from './script/parser';
 import { BacDiagnostics, BacDiagnostic } from './script/diagnostics';
+import { runBindingCheck } from './validate/binding-check';
 import { runContractCheck } from './validate/contract-check';
 import { runReferenceCheck } from './validate/reference-check';
 import { runTypeCheck } from './validate/type-check';
@@ -214,6 +215,7 @@ async function runOnceNoEngine(filePath: string): Promise<void> {
   const ast    = parse(tokens, diags);
   runContractCheck(ast, diags);
   runReferenceCheck(ast, diags);
+  runBindingCheck(ast, diags);
   runTypeCheck(ast, diags);
   const out = {
     ok:           !diags.items.some((d) => d.severity === 'error'),
@@ -488,6 +490,7 @@ function runAstPasses(
   const ast    = parse(tokens, diags);
   runContractCheck(ast, diags);
   runReferenceCheck(ast, diags);
+  runBindingCheck(ast, diags);
   runTypeCheck(ast, diags);
   state.astDiagnostics = diags.items.map((d) => toLspDiagnosticFromBac(d, doc));
 }

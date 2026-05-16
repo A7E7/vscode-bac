@@ -113,5 +113,19 @@
     "prefix": "await",
     "body": "await Delay(${1:0.5})$0",
     "description": "Latent delay (only inside events)"
+  },
+  "Widget block": {
+    "prefix": "widget",
+    "body": [
+      "widget ${1:Root}: ${2:CanvasPanel} {",
+      "  $0",
+      "}"
+    ],
+    "description": "UMG widget tree root (only inside UserWidget subclasses)"
+  },
+  "Widget property binding": {
+    "prefix": "bind",
+    "body": "${1:Property} => ${2:FunctionOrVariable}",
+    "description": "Bind a UMG widget property to a function or member variable"
   }
 }

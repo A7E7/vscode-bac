@@ -229,8 +229,37 @@ function printMember(m: ast.BacMember, cursor: CommentCursor): Doc {
     case 'function':     parts.push(printFunction(m, cursor));  break;
     case 'event':        parts.push(printEvent(m, cursor));     break;
     case 'construction': parts.push(printConstruction(m, cursor)); break;
+    case 'widget':       parts.push(printWidget(m, cursor, /*nested=*/false)); break;
   }
   return parts;
+}
+
+// `widget Root: ... { … }` (top-level form) and the keyword-less child
+// form (`Name: Type { … }`). The body recursively contains static
+// assignments (`Name = expr`), bindings (`Name => Func`), and child
+// widgets.
+function printWidget(w: ast.BacWidgetDecl, cursor: CommentCursor, nested: boolean): Doc {
+  const head: Doc[] = [];
+  if (!nested) { head.push('widget '); }
+  head.push(w.name, ': ', printType(w.type));
+  if (w.defaults.length === 0 && w.children.length === 0) { return head; }
+  const body: Doc[] = [];
+  for (let i = 0; i < w.defaults.length; i++) {
+    const def = w.defaults[i];
+    body.push(...cursor.flushBefore(def.location.offset));
+    body.push(def.name, def.isBinding ? ' => ' : ' = ', printExpr(def.value));
+    if (i < w.defaults.length - 1 || w.children.length > 0) { body.push(hardline); }
+  }
+  for (let i = 0; i < w.children.length; i++) {
+    const child = w.children[i];
+    body.push(...cursor.flushBefore(child.location.offset));
+    body.push(printWidget(child, cursor, /*nested=*/true));
+    if (i < w.children.length - 1) { body.push(hardline); }
+  }
+  head.push(' {');
+  head.push(indent([hardline, ...body]));
+  head.push(hardline, '}');
+  return head;
 }
 
 function printVariable(m: ast.BacVariableDecl): Doc {

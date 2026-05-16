@@ -12,6 +12,40 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — UMG widget property bindings (`Foo => Func`) across grammar / LSP / formatter / highlights / snippets
+
+Wire-stable items (plugin → LSP parity); plugin-side change documented
+in `BlueprintAsCode/CHANGELOG.md` (same release window).
+
+- **Tree-sitter grammar** (`grammar.js`) — added the missing `widget_decl`,
+  `widget_body`, `child_widget_decl`, `widget_assignment`, and
+  `widget_binding` rules. The handwritten LSP parser already accepted
+  the `=>` syntax (`lsp/src/script/parser.ts:813-822`) but tree-sitter
+  silently rejected it. Corpus test in `test/corpus/widgets.txt`
+  exercises function-binding, variable-binding, and dotted-LHS
+  (`Slot.X`) static-override shapes.
+- **Lexer (`token.ts`)** — `None` (capitalised) is now also a `Kw_None`
+  keyword. The C++ lexer (`BacLexer.cpp`) already accepted both `none`
+  and `None`; this closes the parity gap. Without it the transcriber's
+  emitted `Foo => None` lines parsed `None` as an identifier on the LSP
+  side, so the binding validator couldn't emit BAC3142.
+- **Binding diagnostics** — new `lsp/src/validate/binding-check.ts`
+  ports `BacBindingCheck.cpp`. Emits **BAC3140** (target not declared
+  on the class) and **BAC3142** (RHS not a bare identifier) on the LSP
+  side without waiting for a regenerate. BAC3141 (property bindability)
+  stays plugin-only because it needs engine reflection on the widget
+  class. Three new parity manifest entries cover both error cases plus
+  the happy path. Wired into `server.ts` and `parity-test.ts`.
+- **Formatter (`lsp/src/format/print.ts`)** — `printWidget` is new (the
+  formatter previously had no `'widget'` case in `printMember` and
+  silently dropped widget blocks). Respects `isBinding` to emit `=>`
+  instead of `=` for binding lines so round-trip formatting doesn't
+  silently rewrite `Foo => Func` to `Foo = Func`.
+- **Highlights (`queries/highlights.scm`)** — `=>` joins the `@operator`
+  set.
+- **Snippets (`editors/code/snippets/bac.code-snippets`)** — new `widget`
+  and `bind` prefixes.
+
 ### Added — cross-event pin references (`EventName::PinName`) — grammar / AST / validator (wire change)
 
 Coordinates with the plugin-side change documented in
