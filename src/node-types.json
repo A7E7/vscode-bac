@@ -1056,6 +1056,10 @@
           "named": true
         },
         {
+          "type": "macro_decl",
+          "named": true
+        },
+        {
           "type": "settings_block",
           "named": true
         },
@@ -2417,6 +2421,101 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "macro_decl",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "macro_input_body_list",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "return_type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "type_ref",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "decorator",
+          "named": true
+        },
+        {
+          "type": "parameter",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "macro_input_body_block",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "macro_input_body_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "macro_input_body_block",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -4149,6 +4248,10 @@
   {
     "type": "line_comment",
     "named": true
+  },
+  {
+    "type": "macro",
+    "named": false
   },
   {
     "type": "none_literal",

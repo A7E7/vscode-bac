@@ -255,11 +255,36 @@ export interface BacWidgetDecl extends BacMemberBase {
   defaults: BacAssignment[];
   children: BacWidgetDecl[];
 }
+/**
+ * `outputs (Name [, Name…])` clause: declares unified multi-output exec
+ * pins on a macro's OutputTunnel. Each entry may carry `@display(...)` (or
+ * other) decorators applied to that one output. Mirrors the C++
+ * `FBacMacroOutput`.
+ */
+export interface BacMacroOutput {
+  name:       string;
+  decorators: BacDecorator[];
+  location:   BacSourceLocation;
+}
+/**
+ * `inputs (Name [, Name…])` clause: declares multi-input exec pins on a
+ * macro's InputTunnel. The body must then contain one `Name() { stmts }`
+ * block per declared input. Mirrors the C++ `FBacMacroInputBody`.
+ */
+export interface BacMacroInputBody {
+  name:       string;
+  decorators: BacDecorator[];
+  body?:      BacBlockStmt;
+  location:   BacSourceLocation;
+}
 export interface BacMacroDecl extends BacMemberBase {
   kind:        'macro';
   name:        string;
+  bPure:       boolean;
   params:      BacParam[];
   returnType?: BacTypeRef;
+  outputs:     BacMacroOutput[];
+  inputBodies: BacMacroInputBody[];
   body:        BacBlockStmt;
 }
 /**

@@ -463,11 +463,14 @@ class Parser {
       case BacTokenKind.Kw_Function:     return this.parseFunctionDecl(decorators, false);
       case BacTokenKind.Kw_Pure: {
         this.advance();
-        if (!this.check(BacTokenKind.Kw_Function)) {
-          this.error("Expected 'function' after 'pure'.", this.current().location, 'BAC1020');
-          return undefined;
+        if (this.check(BacTokenKind.Kw_Function)) {
+          return this.parseFunctionDecl(decorators, true);
         }
-        return this.parseFunctionDecl(decorators, true);
+        if (this.check(BacTokenKind.Kw_Macro)) {
+          return this.parseMacroDecl(decorators, true);
+        }
+        this.error("Expected 'function' or 'macro' after 'pure'.", this.current().location, 'BAC1020');
+        return undefined;
       }
       case BacTokenKind.Kw_Event:        return this.parseEventDecl(decorators);
       case BacTokenKind.Kw_Construction: return this.parseConstructionDecl(decorators);
@@ -624,15 +627,27 @@ class Parser {
     return out;
   }
 
-  // `macro Name(params): Ret { … }` — same syntactic shape as a function
-  // but produces a BacMacroDecl. The plugin's generator stores macros on
-  // Blueprint->MacroGraphs with UK2Node_Tunnel terminators. Phase 1 only
-  // round-trips the declaration surface — non-empty bodies emit BAC3145
-  // on the C++ side and the body content is dropped.
-  private parseMacroDecl(decorators: ast.BacDecorator[]): ast.BacMacroDecl {
+  // `[pure] macro Name(params)[: Ret] { body }` — produces a BacMacroDecl.
+  // The plugin's generator stores macros on Blueprint->MacroGraphs with
+  // UK2Node_Tunnel terminators.
+  //
+  // Unified macro syntax: `:Exec`-typed params model the macro's input
+  // (`In: Exec`) and output (`out Foo: Exec`) exec pins in declaration
+  // order. Non-`out` `:Exec` params produce InputTunnel exec OUTPUT pins
+  // (each drives a body block); `out X: Exec` produces OutputTunnel
+  // exec INPUT pins (drivable by bare `X()` route calls from inside any
+  // body).
+  //
+  // Body shape:
+  //   • non-pure (has `:Exec` input params) — sequence of `Name() { stmts }`
+  //     blocks, one per `:Exec` input param, matched by name.
+  //   • pure macro (no `:Exec` params anywhere) — single statement-list
+  //     body. Pin-flow shape mirrors `pure function` exactly.
+  private parseMacroDecl(decorators: ast.BacDecorator[], bPure: boolean = false): ast.BacMacroDecl {
     const out: ast.BacMacroDecl = {
       kind: 'macro', location: this.current().location, decorators,
-      name: '', params: [], body: { kind: 'block', location: NO_LOCATION, statements: [] },
+      name: '', bPure, params: [], outputs: [], inputBodies: [],
+      body: { kind: 'block', location: NO_LOCATION, statements: [] },
     };
     this.advance(); // 'macro'
     out.name = this.expectIdentifier('macro name');
@@ -650,7 +665,64 @@ class Parser {
     this.expect(BacTokenKind.RParen, "')' to close parameter list");
     if (this.match(BacTokenKind.Colon)) { out.returnType = this.parseTypeRef(); }
     this.skipNewlines();
-    out.body = this.parseBlock();
+
+    // Derive InputBodies / Outputs from the param list. `:Exec` typed
+    // params name the macro's exec pins; non-`out` becomes an
+    // InputTunnel exec output pin (driving a body block), `out` becomes
+    // an OutputTunnel exec input pin (drivable by route calls from
+    // inside any body). The order in the param list determines pin
+    // order in BP.
+    for (const p of out.params) {
+      if (!p.type || p.type.baseName !== 'Exec') { continue; }
+      if (p.bIsOut) {
+        out.outputs.push({ name: p.name, decorators: [], location: out.location });
+      } else {
+        out.inputBodies.push({ name: p.name, decorators: [], location: out.location });
+      }
+    }
+
+    if (out.inputBodies.length > 0) {
+      // Non-pure: sequence of `Name() { stmts }` blocks, one per
+      // declared `:Exec` input param, matched by name.
+      this.expect(BacTokenKind.LBrace, "'{' to begin macro body");
+      while (true) {
+        this.skipNewlines();
+        if (this.check(BacTokenKind.RBrace) || this.isAtEnd()) { break; }
+        const nameTok = this.current();
+        const blockName = this.expectIdentifier('input-body block name');
+        if (!blockName) { break; }
+        this.expect(BacTokenKind.LParen, "'(' after input-body block name");
+        this.expect(BacTokenKind.RParen, "')' after input-body block name");
+        const blockBody = this.parseBlock();
+        const slot = out.inputBodies.find(b => b.name === blockName);
+        if (slot) {
+          if (slot.body) {
+            this.error(
+              `Macro '${out.name}': duplicate body for input '${blockName}'.`,
+              nameTok.location, 'BAC1027');
+          } else {
+            slot.body = blockBody;
+          }
+        } else {
+          this.error(
+            `Macro '${out.name}': input-body block '${blockName}' does not match any declared \`:Exec\` input parameter.`,
+            nameTok.location, 'BAC1028');
+        }
+        this.skipNewlines();
+      }
+      this.expect(BacTokenKind.RBrace, "'}' to close macro body");
+
+      // Every declared `:Exec` input must have a matching body block.
+      for (const slot of out.inputBodies) {
+        if (!slot.body) {
+          this.error(
+            `Macro '${out.name}': input '${slot.name}' (\`:Exec\` parameter) has no matching \`${slot.name}() { ... }\` body block.`,
+            slot.location, 'BAC1032');
+        }
+      }
+    } else {
+      out.body = this.parseBlock();
+    }
     return out;
   }
 

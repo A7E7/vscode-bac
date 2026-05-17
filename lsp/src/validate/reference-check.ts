@@ -294,8 +294,11 @@ function checkCrossEventRefs(cls: ast.BacClassDecl, sym: ClassSymbols, out: BacD
     switch (m.kind) {
       case 'function':
       case 'event':
+        visitCrossEventInBlock(m.body, sym, out);
+        break;
       case 'macro':
         visitCrossEventInBlock(m.body, sym, out);
+        for (const ib of m.inputBodies) { visitCrossEventInBlock(ib.body, sym, out); }
         break;
       case 'construction':
         visitCrossEventInBlock(m.body, sym, out);

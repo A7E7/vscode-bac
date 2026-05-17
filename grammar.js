@@ -29,6 +29,18 @@ module.exports = grammar({
     // (`>` then `(` for generic call vs `,`/`)` for less-than chained) tells
     // them apart.
     [$.type_ref, $._expression],
+    // A bare `{}` inside a macro decl can be either an empty single-statement
+    // block or an empty per-input body list. The C++ parser decides upfront
+    // by inspecting whether `inputs (...)` was provided; tree-sitter can't
+    // see that earlier choice once it's reducing the body, so let GLR carry
+    // both interpretations until the surrounding context resolves it.
+    [$.block, $.macro_input_body_list],
+    // Inside a macro body, a leading identifier could either start an
+    // expression-statement (`Identifier(...)` call) or a per-input body
+    // block (`Identifier() { ... }`). Same disambiguation reason as above —
+    // the choice depends on whether `inputs (...)` was present, which GLR
+    // can determine once the surrounding macro_decl reduces.
+    [$.macro_input_body_block, $._expression],
   ],
 
   precedences: $ => [
@@ -149,6 +161,7 @@ module.exports = grammar({
       $.settings_block,
       $.timeline_decl,
       $.widget_decl,
+      $.macro_decl,
     ),
 
     // `defaults { Property = Value … }` — class-scope CDO overrides. Each
@@ -244,6 +257,46 @@ module.exports = grammar({
     construction_decl: $ => seq(
       repeat($.decorator),
       'construction',
+      field('body', $.block),
+    ),
+
+    // `[pure] macro Name(params)[: Ret] { body }`
+    //
+    // Unified macro syntax: `:Exec`-typed params name the macro's exec
+    // pins in declaration order. Non-`out` `:Exec` produces an input
+    // exec pin (drives a body block); `out X: Exec` produces an output
+    // exec pin (drivable by route calls). The `pure` modifier marks
+    // macros with no exec pins (body is pin-flow only, like `pure
+    // function`).
+    //
+    // Body has two shapes:
+    //   • `{ stmts }`                                 — pure macro body
+    //   • `{ Name() {stmts}  Name() {stmts}  … }`     — per-input bodies
+    //                                                   (one per `:Exec` input
+    //                                                   param, in declaration
+    //                                                   order)
+    macro_decl: $ => seq(
+      repeat($.decorator),
+      optional('pure'),
+      'macro',
+      field('name', $.identifier),
+      '(',
+      optional(commaSep1($.parameter)),
+      ')',
+      optional(seq(':', field('return_type', $.type_ref))),
+      field('body', choice($.block, $.macro_input_body_list)),
+    ),
+
+    macro_input_body_list: $ => seq(
+      '{',
+      repeat($.macro_input_body_block),
+      '}',
+    ),
+
+    macro_input_body_block: $ => seq(
+      field('name', $.identifier),
+      '(',
+      ')',
       field('body', $.block),
     ),
 

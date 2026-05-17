@@ -254,3 +254,147 @@ class BP_Coin : Actor {
         (event_decl
           name: (identifier)
           body: (block))))))
+
+==================
+Pure macro with return
+==================
+
+class X : Actor {
+  pure macro Identity(x: int): int {
+    return x
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (macro_decl
+        name: (identifier)
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        return_type: (type_ref base: (identifier))
+        body: (block
+          (return_statement value: (identifier)))))))
+
+==================
+Macro with In: Exec and out execs (route calls in body)
+==================
+
+class X : Actor {
+  macro CheckPlayer(In: Exec, c: Controller, out Success: Exec, out Fail: Exec) {
+    In() {
+      if (c == none) { Fail() } else { Success() }
+    }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (macro_decl
+        name: (identifier)
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        body: (macro_input_body_list
+          (macro_input_body_block
+            name: (identifier)
+            body: (block
+              (if_statement
+                condition: (binary_expression
+                  left: (identifier)
+                  right: (none_literal))
+                then: (block
+                  (expression_statement
+                    (call_expression callee: (identifier))))
+                else: (block
+                  (expression_statement
+                    (call_expression callee: (identifier))))))))))))
+
+==================
+Macro with @display-decorated out exec param
+==================
+
+class X : Actor {
+  macro M(In: Exec, @display("Has Match") out HasMatch: Exec, out NoMatch: Exec) {
+    In() {
+      HasMatch()
+    }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (macro_decl
+        name: (identifier)
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          (decorator
+            name: (identifier)
+            (decorator_arg value: (string_literal)))
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        body: (macro_input_body_list
+          (macro_input_body_block
+            name: (identifier)
+            body: (block
+              (expression_statement
+                (call_expression callee: (identifier))))))))))
+
+==================
+Macro with multi-input bodies
+==================
+
+class X : Actor {
+  macro Toggle(On: Exec, Off: Exec) {
+    On() {}
+    Off() {}
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (macro_decl
+        name: (identifier)
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        body: (macro_input_body_list
+          (macro_input_body_block name: (identifier) body: (block))
+          (macro_input_body_block name: (identifier) body: (block)))))))

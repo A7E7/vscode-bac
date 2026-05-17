@@ -12,6 +12,90 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Changed — unified macro syntax: `:Exec`-typed params replace `pure macro` / `inputs (...)` / `outputs (...)` clauses
+
+Tracks the plugin-side breaking change (see
+[`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode)
+for the full rationale and surface-area diff). The supersedes-this entry
+in this CHANGELOG (`pure macro`, `inputs (...)`, `outputs (...)` macro
+clauses) shipped this morning but is now SUPERSEDED — those clauses no
+longer parse.
+
+**Surface area touched in this repo:**
+
+- **Tree-sitter grammar** (`grammar.js`) — dropped `macro_inputs_clause`,
+  `macro_outputs_clause`, `macro_input`, `macro_output`. The
+  `macro_decl` rule is now just `[pure] macro Name(params)[: Ret] { body }`
+  (no `pure` keyword in practice — see below) with body choice between
+  `block` (pure shape) and `macro_input_body_list` (per-input blocks).
+  Conflicts for the empty-body case and the body-block-vs-expression
+  ambiguity stay in place.
+- **Lexer (`token.ts`)** — `Kw_Inputs` / `Kw_Outputs` tokens retained in
+  the enum for wire-stability ordering, but the parser no longer reads
+  them. New macro syntax uses `Exec` as a regular type identifier in
+  param position; no new keyword.
+- **AST (`ast.ts`)** — `BacMacroDecl.outputs` / `inputBodies` retained
+  for the body-block dispatch + diagnostic surface, but are now derived
+  from `params` (one entry per `:Exec` typed param) at parse time
+  instead of from explicit clauses.
+- **Parser (`parser.ts`)** — `parseMacroDecl` derives `outputs` /
+  `inputBodies` by walking `params` for `:Exec`-typed entries (non-`out`
+  → input body slot, `out` → output route target). Body parsing remains
+  per-input `Name() { stmts }` blocks when at least one `:Exec` input
+  exists; otherwise a single statement-list block (pure shape). Drops
+  the `pure macro` dispatch from the class-member switch.
+- **BAC1029 / BAC1031** — emission removed (unreachable; clauses no
+  longer parse). Reserved in the cross-repo wire-stable code list.
+- **Hover (`navigation/hover.ts`)** — renders the unified param list
+  including `out` prefix for output params; the `pure` keyword is NOT
+  emitted in hover signatures (matches the source-language convention —
+  purity is structural, not lexical).
+
+### Added — `pure macro`, `inputs (...)`, `outputs (...)` macro clauses (grammar + LSP parity with plugin)
+
+Wire-stable grammar mirror of the BlueprintAsCode plugin macro work
+(`pure macro`, `inputs (Name [, …])` + per-input body blocks,
+`outputs (Name [, …])` unified multi-output clause). Without this, the
+LSP marks transcribed `.bac` files with the new shapes as syntax
+errors. Plugin-side history is in
+[`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode)
+under the matching `[Unreleased]` window.
+
+- **Tree-sitter grammar** (`grammar.js`) — added `macro_decl` (with
+  optional `pure` modifier), `macro_inputs_clause`, `macro_outputs_clause`,
+  `macro_input` / `macro_output` (decorator-aware), `macro_input_body_list`,
+  and `macro_input_body_block`. Two conflicts declared so GLR can
+  disambiguate the `{}` body shape based on whether `inputs (...)` was
+  provided. Corpus tests in `test/corpus/classes.txt` exercise the
+  legacy single-exec body, `pure macro` with `return`, `outputs (...)`
+  with route calls, `@display(...)`-decorated outputs, and multi-input
+  bodies.
+- **Lexer (`token.ts`)** — added `Kw_Inputs` and `Kw_Outputs` tokens +
+  `inputs:` / `outputs:` entries in `KW_NAMES`.
+- **AST (`ast.ts`)** — `BacMacroDecl` extended with `bPure`, `outputs:
+  BacMacroOutput[]`, `inputBodies: BacMacroInputBody[]`. New
+  `BacMacroOutput` and `BacMacroInputBody` structs mirror the plugin's
+  `FBacMacroOutput` / `FBacMacroInputBody`.
+- **Parser (`parser.ts`)** — `Kw_Pure` dispatch accepts `pure macro`
+  alongside `pure function`. `parseMacroDecl` now parses optional
+  `inputs (...)` and `outputs (...)` clauses; when `inputs (...)` is
+  non-empty, the body is a sequence of `Name() { stmts }` blocks
+  matched into `inputBodies` by name. Emits **BAC1027** (duplicate body
+  for input), **BAC1028** (body-block name doesn't match a declared
+  input), **BAC1029** (duplicate name in `inputs (...)`), **BAC1031**
+  (duplicate name in `outputs (...)`), **BAC1032** (declared input has
+  no matching `Name() { ... }` body block). BAC1029/1031/1032 are new
+  parser-level codes that match the plugin's parser-emitted codes
+  exactly. Note: BAC1030 belongs to `asset(...)` arg validation —
+  reserved, do not reuse.
+- **Reference check (`validate/reference-check.ts`)** — cross-event
+  walker now visits per-input macro bodies in addition to the regular
+  body, so references inside `On() { … }` blocks aren't silently
+  skipped.
+- **Hover (`navigation/hover.ts`)** — `macro` hover now surfaces
+  `pure`, `inputs (…)`, and `outputs (…)` so the signature shown in
+  the IDE matches the actual declaration shape.
+
 ### Added — UMG widget property bindings (`Foo => Func`) across grammar / LSP / formatter / highlights / snippets
 
 Wire-stable items (plugin → LSP parity); plugin-side change documented

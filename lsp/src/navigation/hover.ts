@@ -254,8 +254,17 @@ function formatClassMember(m: ast.BacMember): string {
       ].filter(Boolean).join('\n');
     }
     case 'macro': {
-      const params = m.params.map(p => `${p.name}: ${formatType(p.type)}`).join(', ');
-      const ret    = m.returnType ? `: ${formatType(m.returnType)}` : '';
+      // Unified macro syntax: every pin (data + exec, input + output) is a
+      // typed param in the param list. `:Exec` params produce the macro's
+      // exec pins; `out` flips a param to the OutputTunnel side. No `pure`
+      // keyword — purity is inferred from the absence of any `:Exec`
+      // input param. Hover surfaces the full signature including out
+      // params so the IDE matches the actual declaration shape.
+      const params = m.params.map(p => {
+        const out = p.bIsOut ? 'out ' : '';
+        return `${out}${p.name}: ${formatType(p.type)}`;
+      }).join(', ');
+      const ret = m.returnType ? `: ${formatType(m.returnType)}` : '';
       return [
         `\`macro\` **${m.name}**(${params})${ret}`,
         decoratorsBlock,
