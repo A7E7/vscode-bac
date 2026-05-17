@@ -12,6 +12,22 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Fixed — timeline `track` names accept quoted string-literal form
+
+Designer-named timeline tracks frequently contain spaces (`Movement lerp`, `Lock rotation`, `SK StrengthMultiplier`); pre-fix the grammar's `track_decl` rule required a bare identifier, so the transcribed `.bac` failed to parse at the space. Grammar extended to accept either form:
+
+```
+track Coin: float = asset("...")            // existing
+track "Movement lerp": float                // new — quoted carrier
+```
+
+Wire-stable grammar change mirrored across:
+- `grammar.js` — `track_decl.name` becomes `choice($.identifier, $.string_literal)`
+- `lsp/src/script/parser.ts` — `parseTimelineDecl` checks `BacTokenKind.StringLit` before falling back to `expectIdentifier`
+- `test/corpus/classes.txt` — new case `Timeline track name with space (quoted carrier)`
+
+See [`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode) for the plugin-side transcriber/validator changes and the AI-diff impact on the ContentExamples2 corpus (15-BP timeline cluster unblocked).
+
 ### Changed — unified macro syntax: `:Exec`-typed params replace `pure macro` / `inputs (...)` / `outputs (...)` clauses
 
 Tracks the plugin-side breaking change (see

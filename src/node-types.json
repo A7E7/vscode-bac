@@ -3177,6 +3177,10 @@
           {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "string_literal",
+            "named": true
           }
         ]
       },

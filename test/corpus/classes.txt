@@ -256,6 +256,36 @@ class BP_Coin : Actor {
           body: (block))))))
 
 ==================
+Timeline track name with space (quoted carrier)
+==================
+
+class BP_Battery : Actor {
+  timeline Movement {
+    track "Movement lerp": float
+    event Update(Movementlerp: float) {}
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (timeline_decl
+        name: (identifier)
+        (track_decl
+          name: (string_literal)
+          type: (type_ref base: (identifier)))
+        (event_decl
+          name: (identifier)
+          (parameter
+            name: (identifier)
+            type: (type_ref base: (identifier)))
+          body: (block))))))
+
+==================
 Pure macro with return
 ==================
 

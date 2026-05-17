@@ -788,7 +788,20 @@ class Parser {
       if (this.check(BacTokenKind.Kw_Track)) {
         const trackLoc = this.current().location;
         this.advance(); // 'track'
-        const name = this.expectIdentifier('track name');
+        // Track name accepts bare identifier OR quoted string-literal —
+        // Designer-named tracks frequently carry spaces ("Movement lerp",
+        // "Lock rotation"). 1:1 mirror of `BacParser.cpp::ParseTimelineDecl`.
+        let name = '';
+        if (this.check(BacTokenKind.StringLit)) {
+          let lex = this.current().lexeme;
+          if (lex.length >= 2 && lex[0] === '"' && lex[lex.length - 1] === '"') {
+            lex = lex.slice(1, -1);
+          }
+          name = lex;
+          this.advance();
+        } else {
+          name = this.expectIdentifier('track name');
+        }
         if (!name) { this.syncToMemberOrEnd(); continue; }
         const track: ast.BacTrackDecl = { name, location: trackLoc };
         if (this.match(BacTokenKind.Colon)) {

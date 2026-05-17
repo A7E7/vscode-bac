@@ -380,9 +380,14 @@ module.exports = grammar({
       field('value', $._expression),
     ),
 
+    // Designer-named tracks frequently contain spaces ("Movement lerp",
+    // "Lock rotation"); the quoted string-literal form is the round-trip-
+    // faithful carrier (UE auto-derives the Update event's per-track param
+    // by stripping non-identifier chars from the track name). Identifier
+    // form stays primary for the common case.
     track_decl: $ => seq(
       'track',
-      field('name', $.identifier),
+      field('name', choice($.identifier, $.string_literal)),
       optional(seq(
         ':',
         field('type', $.type_ref),
