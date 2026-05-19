@@ -1036,6 +1036,10 @@
       "required": false,
       "types": [
         {
+          "type": "collapsed_decl",
+          "named": true
+        },
+        {
           "type": "component_decl",
           "named": true
         },
@@ -1142,6 +1146,46 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "collapsed_decl",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "decorator",
+          "named": true
+        },
+        {
+          "type": "parameter",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -4159,6 +4203,10 @@
   },
   {
     "type": "class",
+    "named": false
+  },
+  {
+    "type": "collapsed",
     "named": false
   },
   {

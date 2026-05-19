@@ -286,6 +286,16 @@ function formatClassMember(m: ast.BacMember): string {
         decoratorsBlock,
       ].filter(Boolean).join('\n');
     }
+    case 'collapsed': {
+      const params = m.params.map(p => {
+        const out = p.bIsOut ? 'out ' : '';
+        return `${out}${p.name}: ${formatType(p.type)}`;
+      }).join(', ');
+      return [
+        `\`collapsed\` **${m.name}**(${params})`,
+        decoratorsBlock,
+      ].filter(Boolean).join('\n');
+    }
   }
 }
 

@@ -428,3 +428,36 @@ class X : Actor {
         body: (macro_input_body_list
           (macro_input_body_block name: (identifier) body: (block))
           (macro_input_body_block name: (identifier) body: (block)))))))
+
+
+==================
+Collapsed pure data-only
+==================
+
+class X : Actor {
+  var InitialPosition: Vector
+
+  collapsed Composite_OscillatingTarget(out KinematicTarget: Vector) {
+    KinematicTarget = InitialPosition
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (class_body
+      (variable_decl
+        name: (identifier)
+        type: (type_ref base: (identifier)))
+      (collapsed_decl
+        name: (identifier)
+        (parameter
+          name: (identifier)
+          type: (type_ref base: (identifier)))
+        body: (block
+          (assignment_statement
+            target: (identifier)
+            value: (identifier)))))))

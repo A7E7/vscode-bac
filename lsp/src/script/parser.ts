@@ -476,12 +476,13 @@ class Parser {
       case BacTokenKind.Kw_Construction: return this.parseConstructionDecl(decorators);
       case BacTokenKind.Kw_Widget:       return this.parseWidgetDecl(decorators);
       case BacTokenKind.Kw_Macro:        return this.parseMacroDecl(decorators);
+      case BacTokenKind.Kw_Collapsed:    return this.parseCollapsedDecl(decorators);
       case BacTokenKind.Kw_Defaults:     return this.parseDefaultsBlock(decorators);
       case BacTokenKind.Kw_Settings:     return this.parseSettingsBlock(decorators);
       case BacTokenKind.Kw_Timeline:     return this.parseTimelineDecl(decorators);
       default: {
         this.error(
-          `Expected class member (var, component, function, event, construction, widget, animation, timeline, macro, defaults, settings) but got '${tokenKindName(this.current().kind)}'.`,
+          `Expected class member (var, component, function, event, construction, widget, animation, timeline, macro, collapsed, defaults, settings) but got '${tokenKindName(this.current().kind)}'.`,
           this.current().location, 'BAC1021');
         return undefined;
       }
@@ -723,6 +724,40 @@ class Parser {
     } else {
       out.body = this.parseBlock();
     }
+    return out;
+  }
+
+  // `collapsed Name(out X: Type, ...) { OutName = expr ... }` — UE's
+  // K2Node_Composite (collapsed sub-graph) as a class-scope declaration.
+  // Phase 1 supports the pure data-only shape only: every param must be
+  // an `out` data param (no `:Exec` types, no non-`out` inputs). Body is
+  // a pin-flow statement list mirroring the pure-macro convention.
+  // Output references at the call site use the `::` cross-scope operator
+  // (`Composite_X::OutName`). See COLLAPSED_GRAPHS.md in the plugin repo
+  // for the full semantics including the phase-2 surface (exec pins,
+  // `contains`, multi-exec body shape, label-routed secondary entries).
+  private parseCollapsedDecl(decorators: ast.BacDecorator[]): ast.BacCollapsedDecl {
+    const out: ast.BacCollapsedDecl = {
+      kind: 'collapsed', location: this.current().location, decorators,
+      name: '', params: [],
+      body: { kind: 'block', location: NO_LOCATION, statements: [] },
+    };
+    this.advance(); // 'collapsed'
+    out.name = this.expectIdentifier('collapsed name');
+    if (!this.expect(BacTokenKind.LParen, "'(' to begin parameter list")) { return out; }
+    while (true) {
+      this.skipNewlines();
+      if (this.check(BacTokenKind.RParen)) { break; }
+      const p = this.parseParam();
+      if (!p) { break; }
+      out.params.push(p);
+      this.skipNewlines();
+      if (!this.match(BacTokenKind.Comma)) { break; }
+    }
+    this.skipNewlines();
+    this.expect(BacTokenKind.RParen, "')' to close parameter list");
+    this.skipNewlines();
+    out.body = this.parseBlock();
     return out;
   }
 

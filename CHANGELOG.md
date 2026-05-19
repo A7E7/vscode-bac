@@ -12,6 +12,34 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Added — `collapsed Name(out X: T, …) { X = expr … }` class member (grammar + LSP parity with plugin)
+
+Wire-stable grammar mirror of the BlueprintAsCode plugin's phase-1 collapsed-graph round-trip — UE `K2Node_Composite` ("Collapse to Subgraph") now has a first-class `.bac` shape. Plugin-side history is in [`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode) under the matching `[Unreleased]` window; see `COLLAPSED_GRAPHS.md` there for the full design (locked syntax, phase 1/2 split, semantics, open questions).
+
+Locked syntax — class-scope declaration mirroring the pure-macro shape; output references at the call site use the existing `::` cross-scope operator:
+
+```bac
+collapsed Composite_OscillatingTarget(out KinematicTarget: Vector) {
+    KinematicTarget = InitialPosition + Vector(1.0, 0.0, 0.0)
+}
+
+event Tick(DeltaSeconds: float) {
+    self.K2_SetActorLocation(Composite_OscillatingTarget::KinematicTarget, false, false)
+}
+```
+
+Surface area touched in this repo:
+
+- **Tree-sitter grammar** (`grammar.js`) — new `collapsed_decl` rule, added to the `_class_member` choice alongside `macro_decl`. Reuses the existing `$.parameter` rule (which already supports the `out` modifier) for the param list.
+- **Tree-sitter corpus** (`test/corpus/classes.txt`) — new `Collapsed pure data-only` case asserting the tree shape.
+- **Lexer** (`lsp/src/script/token.ts`) — `Kw_Collapsed` added between `Kw_Macro` and `Kw_Inputs` (matches the plugin's `EBacTokenKind` ordering). `collapsed` registered in `KW_NAMES`; auto-flows into `TOKEN_NAMES` as `kw_collapsed`.
+- **AST** (`lsp/src/script/ast.ts`) — `BacCollapsedDecl` interface mirrors the C++ `FBacCollapsedDecl`; added to the `BacMember` union.
+- **Parser** (`lsp/src/script/parser.ts`) — `parseCollapsedDecl` is a slim parse path (name, parenthesised param list, body block). Dispatch case added to `parseMember`; class-member error message updated to list `collapsed`.
+- **Hover** (`lsp/src/navigation/hover.ts`) — new `'collapsed'` case formats the signature as `` `collapsed` **Name**(out X: T, …) `` matching the BAC declaration shape.
+- **Contract check** (`lsp/src/validate/contract-check.ts`) — `'collapsed'` maps to the `macro` decorator target (phase 1 reuses `@description` / `@nodeColor` from the macro decorator catalog). Tighten if phase 2 introduces collapsed-specific decorators.
+
+No wire-protocol changes — additive grammar / AST / lexer extension only. Diagnostic codes added to the parity surface come from the plugin side (`BAC3160`–`BAC3167`, generator-only — these don't reach the LSP wire today).
+
 ### Fixed — timeline `track` names accept quoted string-literal form
 
 Designer-named timeline tracks frequently contain spaces (`Movement lerp`, `Lock rotation`, `SK StrengthMultiplier`); pre-fix the grammar's `track_decl` rule required a bare identifier, so the transcribed `.bac` failed to parse at the space. Grammar extended to accept either form:

@@ -162,6 +162,7 @@ module.exports = grammar({
       $.timeline_decl,
       $.widget_decl,
       $.macro_decl,
+      $.collapsed_decl,
     ),
 
     // `defaults { Property = Value … }` — class-scope CDO overrides. Each
@@ -296,6 +297,24 @@ module.exports = grammar({
     macro_input_body_block: $ => seq(
       field('name', $.identifier),
       '(',
+      ')',
+      field('body', $.block),
+    ),
+
+    // `collapsed Name(out X: Type, ...) { OutName = expr ... }` — UE's
+    // K2Node_Composite (collapsed sub-graph) as a class-scope declaration.
+    // Phase 1 shape only: pure data-only — every param is an `out` data
+    // param (no `:Exec` types yet, no `contains` clause). Output
+    // references at the call site use the existing `::` cross-scope
+    // operator (`Composite_X::OutName`). See COLLAPSED_GRAPHS.md in the
+    // plugin repo for the phase-2 surface (exec pins, multi-exec body,
+    // `contains`, label-routed secondary entries).
+    collapsed_decl: $ => seq(
+      repeat($.decorator),
+      'collapsed',
+      field('name', $.identifier),
+      '(',
+      optional(commaSep1($.parameter)),
       ')',
       field('body', $.block),
     ),

@@ -67,6 +67,12 @@ function memberToTarget(k: ast.BacMember['kind']): Target {
     // Timelines accept zero decorators in slice 1; fold into a neutral
     // target so the decorator-mismatch catalog never triggers on them.
     case 'timeline':     return 'class';
+    // Collapsed graphs (phase 1) reuse the macro decorator surface for
+    // `@description` / `@nodeColor`. Map to `macro` for the contract
+    // checker's bitmask — both targets carry the same metadata host
+    // (an InputTunnel / K2Node_Tunnel) and accept the same decorator
+    // catalog. Tighten if phase 2 introduces collapsed-specific decorators.
+    case 'collapsed':    return 'macro';
   }
 }
 

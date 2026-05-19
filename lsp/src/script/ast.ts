@@ -207,8 +207,8 @@ export interface BacAssignment {
 export type BacMember =
   | BacVariableDecl | BacComponentDecl | BacFunctionDecl
   | BacEventDecl    | BacConstructionDecl | BacWidgetDecl
-  | BacMacroDecl    | BacDefaultsBlock   | BacSettingsBlock
-  | BacTimelineDecl;
+  | BacMacroDecl    | BacCollapsedDecl   | BacDefaultsBlock
+  | BacSettingsBlock | BacTimelineDecl;
 
 interface BacMemberBase {
   location:   BacSourceLocation;
@@ -286,6 +286,21 @@ export interface BacMacroDecl extends BacMemberBase {
   outputs:     BacMacroOutput[];
   inputBodies: BacMacroInputBody[];
   body:        BacBlockStmt;
+}
+/**
+ * `collapsed Name(out X: Type, ...) { body }` — UE's K2Node_Composite
+ * (collapsed sub-graph) as a class-scope declaration. Phase 1 supports
+ * pure data-only shape only: every param must be `out` data (no `:Exec`
+ * types, no non-`out` inputs). Body is a pin-flow statement list of
+ * `OutName = expr` assignments mirroring the pure-macro convention.
+ * Output references at the call site use the `::` cross-scope operator
+ * (`Composite_X::OutName`). See COLLAPSED_GRAPHS.md in the plugin repo.
+ */
+export interface BacCollapsedDecl extends BacMemberBase {
+  kind:    'collapsed';
+  name:    string;
+  params:  BacParam[];      // phase 1: only `out X: Type` data outputs
+  body:    BacBlockStmt;    // pure form — `OutName = expr` assignments
 }
 /**
  * `defaults { Property = Expression … }` — class-scope CDO overrides.
