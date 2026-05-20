@@ -12,6 +12,20 @@ repos move in lockstep when their interfaces change (diagnostic JSON, the
 
 ## [Unreleased]
 
+### Fixed — BAC3140 (orphan widget binding) severity downgrade to Warning (parity with plugin `77375ab`)
+
+The plugin downgraded BAC3140 from Error to Warning in `BacBindingCheck.cpp` (commit `77375ab`, "fix(validate): orphan widget binding emits Warning, not Error"). The TS port at `lsp/src/validate/binding-check.ts` was missed at the time, so the parity test (`npm run parity`) drifted: the plugin manifest expects 0 errors for `Validate_WidgetBindingMissingTarget.bac` (warnings aren't counted), but the TS port kept emitting BAC3140 as `severity: 'error'` — the manifest assertion failed with `BAC3140: expected 0, got 1`.
+
+This commit aligns the TS port: BAC3140 now emits as `severity: 'warning'`. The shape, message, fix hints, and target-resolution semantics are unchanged. BAC3142 (RHS-not-an-identifier) stays Error in both ports.
+
+Why Warning, not Error (mirrored from the plugin-side rationale): UE accepts widget bindings whose target function/variable has been deleted from the source BP — the BP loads, the binding just stays inert at runtime. Real-asset trigger was ContentExamples2's `UMG_ButtonStates` (`Visibility => GetVisiblity_2` orphan), which the editor itself opens without complaint. The plugin's generator backstops the case where the widget PROPERTY doesn't exist (a distinct invariant — schema bug rather than orphan reference) with its own BAC3140 as Error.
+
+Surface area touched in this repo:
+
+- **Binding check** (`lsp/src/validate/binding-check.ts`) — single severity flip on the emit at the end of `walkWidget`; header comment expanded to document the Warning-vs-Error split and reference the plugin-side rationale.
+
+No wire-protocol or grammar change — diagnostic-code semantics only. Parity test (`npm run parity`) now green: 16 passed / 0 failed / 10 skipped.
+
 ### Added — `collapsed Name(out X: T, …) { X = expr … }` class member (grammar + LSP parity with plugin)
 
 Wire-stable grammar mirror of the BlueprintAsCode plugin's phase-1 collapsed-graph round-trip — UE `K2Node_Composite` ("Collapse to Subgraph") now has a first-class `.bac` shape. Plugin-side history is in [`BlueprintAsCode/CHANGELOG.md`](https://github.com/A7E7/BlueprintAsCode) under the matching `[Unreleased]` window; see `COLLAPSED_GRAPHS.md` there for the full design (locked syntax, phase 1/2 split, semantics, open questions).

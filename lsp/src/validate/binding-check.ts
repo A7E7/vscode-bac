@@ -1,9 +1,16 @@
 // 1:1 port of BacBindingCheck.cpp (plugin Validate/ pass).
 //
 // Wire-stable diagnostic codes: BAC3140 (binding target not declared on the
-// class) and BAC3142 (binding RHS not an identifier). BAC3141 (property
-// bindability — existence of `<Name>Delegate` on the widget class) stays
-// plugin-only because it requires engine reflection.
+// class — Warning) and BAC3142 (binding RHS not an identifier — Error).
+// BAC3141 (property bindability — existence of `<Name>Delegate` on the
+// widget class) stays plugin-only because it requires engine reflection.
+//
+// BAC3140 is a *warning* by design: UE accepts widget bindings whose target
+// function/variable has been deleted from the source BP — the BP loads, the
+// binding just stays inert at runtime. Erroring would gate `BacGenerator`
+// from running on assets the editor itself opens without complaint. The
+// plugin-side generator backstops with its own BAC3140 (Error) when the
+// widget PROPERTY doesn't exist — a distinct invariant that DOES block apply.
 //
 // Runs alongside the References pass — script-only symbol resolution is the
 // right peer.
@@ -78,7 +85,7 @@ function walkWidget(w: ast.BacWidgetDecl, sym: BindingSymbols, out: BacDiagnosti
       ? { hint: `Did you mean '${suggested}'?`, fixes: [`replace \`=> ${target}\` with \`=> ${suggested}\``] }
       : {};
     out.items.push({
-      severity: 'error',
+      severity: 'warning',
       code:     'BAC3140',
       location: a.location,
       message:  `Widget '${w.name}' binding '${a.name} => ${target}': target is not a declared function or variable on this class.`,
